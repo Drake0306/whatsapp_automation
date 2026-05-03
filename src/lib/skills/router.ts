@@ -9,6 +9,7 @@ import { escalateSkill } from "./escalate.js";
 import { prescriptionReminderSkill } from "./prescription-reminder.js";
 import { feeReminderSkill } from "./fee-reminder.js";
 import { examCountdownSkill } from "./exam-countdown.js";
+import { feedbackCollectSkill } from "./feedback-collect.js";
 import { db } from "$lib/server/db/index.js";
 import { businessSkills } from "$lib/server/db/schema.js";
 import { eq, and } from "drizzle-orm";
@@ -25,6 +26,7 @@ const SKILL_REGISTRY: Record<string, Skill> = {
   prescription_reminder: prescriptionReminderSkill,
   fee_reminder: feeReminderSkill,
   exam_countdown: examCountdownSkill,
+  feedback_collect: feedbackCollectSkill,
 };
 
 async function getEnabledSkills(businessId: string): Promise<Skill[]> {

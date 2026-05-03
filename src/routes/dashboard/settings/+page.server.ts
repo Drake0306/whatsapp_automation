@@ -5,6 +5,7 @@ import {
   businesses,
   businessToneConfig,
   businessSkills,
+  businessHours,
 } from "$lib/server/db/schema.js";
 import { eq, and } from "drizzle-orm";
 
@@ -31,7 +32,13 @@ export const load: PageServerLoad = async (event) => {
     .from(businessSkills)
     .where(eq(businessSkills.businessId, business.id));
 
-  return { session, business, tone: tone ?? null, skills };
+  const hours = await db
+    .select()
+    .from(businessHours)
+    .where(eq(businessHours.businessId, business.id))
+    .orderBy(businessHours.dayOfWeek);
+
+  return { session, business, tone: tone ?? null, skills, hours };
 };
 
 export const actions: Actions = {
@@ -138,5 +145,61 @@ export const actions: Actions = {
       );
 
     return { success: true };
+  },
+
+  "update-hours": async ({ request, locals }) => {
+    const session = await locals.auth();
+    if (!session?.user?.id) return fail(401);
+
+    const form = await request.formData();
+
+    const [business] = await db
+      .select()
+      .from(businesses)
+      .where(eq(businesses.ownerUserId, session.user.id))
+      .limit(1);
+
+    if (!business) return fail(400);
+
+    const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+    for (let day = 0; day < 7; day++) {
+      const openTime = (form.get(`open_${day}`) as string) || "09:00";
+      const closeTime = (form.get(`close_${day}`) as string) || "20:00";
+      const isClosed = form.get(`closed_${day}`) === "true";
+
+      const [existing] = await db
+        .select()
+        .from(businessHours)
+        .where(
+          and(
+            eq(businessHours.businessId, business.id),
+            eq(businessHours.dayOfWeek, day),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(businessHours)
+          .set({ openTime, closeTime, isClosed })
+          .where(
+            and(
+              eq(businessHours.businessId, business.id),
+              eq(businessHours.dayOfWeek, day),
+            ),
+          );
+      } else {
+        await db.insert(businessHours).values({
+          businessId: business.id,
+          dayOfWeek: day,
+          openTime,
+          closeTime,
+          isClosed,
+        });
+      }
+    }
+
+    return { success: true, section: "hours" };
   },
 };

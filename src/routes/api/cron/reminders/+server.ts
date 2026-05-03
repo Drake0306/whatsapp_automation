@@ -1,8 +1,8 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
 import { db } from "$lib/server/db/index.js";
-import { appointments, businesses, conversations } from "$lib/server/db/schema.js";
-import { eq, and, isNull, lte, gte, sql } from "drizzle-orm";
+import { appointments, businesses, conversations, feedback } from "$lib/server/db/schema.js";
+import { eq, and, isNull, isNotNull, lte, gte, sql } from "drizzle-orm";
 import { sendWhatsAppMessage } from "$lib/server/whatsapp.js";
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -196,6 +196,95 @@ export const POST: RequestHandler = async ({ request }) => {
         convo.customerPhone,
         msgs[days],
       );
+      sent++;
+    }
+  }
+
+  // ── Post-appointment feedback requests ──
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+  const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+
+  const completedNoFeedback = await db
+    .select()
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.status, "completed"),
+        lte(appointments.slotAt, twoHoursAgo),
+        gte(appointments.slotAt, fourHoursAgo),
+      ),
+    );
+
+  for (const appt of completedNoFeedback) {
+    const [existing] = await db
+      .select({ id: feedback.id })
+      .from(feedback)
+      .where(eq(feedback.appointmentId, appt.id))
+      .limit(1);
+
+    if (existing) continue;
+
+    const [biz] = await db
+      .select()
+      .from(businesses)
+      .where(eq(businesses.id, appt.businessId))
+      .limit(1);
+
+    if (!biz?.whatsappPhoneNumberId) continue;
+
+    const msg = `Hi! Thank you for visiting *${biz.name}* today. We'd love your feedback! Please rate your experience from 1 to 5 (just reply with a number).`;
+
+    const ok = await sendWhatsAppMessage(
+      biz.whatsappPhoneNumberId,
+      appt.customerPhone,
+      msg,
+    );
+
+    if (ok) {
+      await db.insert(feedback).values({
+        businessId: appt.businessId,
+        appointmentId: appt.id,
+        customerPhone: appt.customerPhone,
+        feedbackSentAt: now,
+      });
+      sent++;
+    }
+  }
+
+  // ── Google Review nudge for 4-5 star ratings ──
+  const highRatings = await db
+    .select()
+    .from(feedback)
+    .where(
+      and(
+        isNotNull(feedback.respondedAt),
+        gte(feedback.rating, 4),
+        eq(feedback.googleReviewNudgeSent, false),
+      ),
+    );
+
+  for (const fb of highRatings) {
+    const [biz] = await db
+      .select()
+      .from(businesses)
+      .where(eq(businesses.id, fb.businessId))
+      .limit(1);
+
+    if (!biz?.whatsappPhoneNumberId) continue;
+
+    const nudgeMsg = `Thank you so much for the wonderful rating! If you have a minute, a Google review would mean the world to us and help other customers find *${biz.name}*. Simply search for us on Google and tap "Write a review". Thank you!`;
+
+    const ok = await sendWhatsAppMessage(
+      biz.whatsappPhoneNumberId,
+      fb.customerPhone,
+      nudgeMsg,
+    );
+
+    if (ok) {
+      await db
+        .update(feedback)
+        .set({ googleReviewNudgeSent: true })
+        .where(eq(feedback.id, fb.id));
       sent++;
     }
   }

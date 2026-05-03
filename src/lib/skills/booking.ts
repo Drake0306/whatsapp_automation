@@ -3,7 +3,7 @@ import { callLlm } from "$lib/server/llm.js";
 import { skillRouting } from "$lib/config/models.js";
 import { buildSystemPrompt } from "$lib/server/prompt-templates.js";
 import { db } from "$lib/server/db/index.js";
-import { appointments } from "$lib/server/db/schema.js";
+import { appointments, businessHours } from "$lib/server/db/schema.js";
 import { eq, and, gte, lte } from "drizzle-orm";
 
 export const bookingSkill: Skill = {
@@ -35,6 +35,21 @@ export const bookingSkill: Skill = {
       return `${start.toLocaleDateString("en-IN")} ${start.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} (${b.durationMin}min)`;
     });
 
+    const hoursRows = await db
+      .select()
+      .from(businessHours)
+      .where(eq(businessHours.businessId, ctx.businessId))
+      .orderBy(businessHours.dayOfWeek);
+
+    const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    let hoursText = "Business hours: 9 AM to 8 PM, all days.";
+    if (hoursRows.length > 0) {
+      hoursText = "Business hours:\n" + hoursRows.map((h) => {
+        if (h.isClosed) return `${DAYS[h.dayOfWeek]}: Closed`;
+        return `${DAYS[h.dayOfWeek]}: ${h.openTime} – ${h.closeTime}`;
+      }).join("\n");
+    }
+
     const skillContext = `The customer wants to book an appointment. Extract:
 1. What service they want
 2. When they want it (date + time)
@@ -42,7 +57,7 @@ export const bookingSkill: Skill = {
 Currently booked slots (unavailable):
 ${bookedSlots.length > 0 ? bookedSlots.join("\n") : "No bookings yet"}
 
-Business hours: 9 AM to 8 PM, all days.
+${hoursText}
 Today is: ${now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
 
 If the customer hasn't specified a time, suggest 2-3 available slots.

@@ -5,6 +5,7 @@
   const business = $derived($page.data.business);
   const tone = $derived($page.data.tone);
   const skills = $derived($page.data.skills ?? []);
+  const hours = $derived($page.data.hours ?? []);
 
   let saved = $state<string | null>(null);
 
@@ -164,6 +165,64 @@
             Save
           </button>
           {#if saved === "tone"}
+            <span class="text-sm text-green-600">Saved!</span>
+          {/if}
+        </div>
+      </form>
+    </section>
+
+    <hr />
+
+    <!-- Business Hours -->
+    <section>
+      <h2 class="text-lg font-semibold">Business Hours</h2>
+      <p class="mt-1 text-sm text-muted-foreground">Configure when your business is open for appointments.</p>
+      <form
+        method="POST"
+        action="?/update-hours"
+        class="mt-4 space-y-3"
+        use:enhance={() => {
+          return async ({ update }) => {
+            await update();
+            saved = "hours";
+            setTimeout(() => (saved = null), 2000);
+          };
+        }}
+      >
+        {#each ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as dayName, i}
+          {@const h = hours.find((hr: Record<string, unknown>) => hr.dayOfWeek === i)}
+          <div class="flex items-center gap-3 rounded-lg border px-4 py-2">
+            <span class="w-24 text-sm font-medium">{dayName}</span>
+            <label class="flex items-center gap-1 text-xs">
+              <input
+                type="checkbox"
+                name="closed_{i}"
+                value="true"
+                checked={h?.isClosed ?? false}
+                class="rounded"
+              />
+              Closed
+            </label>
+            <input
+              name="open_{i}"
+              type="time"
+              value={h?.openTime ?? "09:00"}
+              class="rounded-md border border-input bg-background px-2 py-1 text-sm"
+            />
+            <span class="text-sm text-muted-foreground">to</span>
+            <input
+              name="close_{i}"
+              type="time"
+              value={h?.closeTime ?? "20:00"}
+              class="rounded-md border border-input bg-background px-2 py-1 text-sm"
+            />
+          </div>
+        {/each}
+        <div class="flex items-center gap-3">
+          <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            Save Hours
+          </button>
+          {#if saved === "hours"}
             <span class="text-sm text-green-600">Saved!</span>
           {/if}
         </div>

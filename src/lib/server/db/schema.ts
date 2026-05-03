@@ -201,6 +201,136 @@ export const escalations = mysqlTable("escalations", {
 });
 
 // ────────────────────────────────────────────
+// Contacts / CRM
+// ────────────────────────────────────────────
+
+export const contacts = mysqlTable(
+  "contacts",
+  {
+    id: varchar("id", { length: 36 })
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    businessId: varchar("business_id", { length: 36 })
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    phone: varchar("phone", { length: 20 }).notNull(),
+    name: varchar("name", { length: 255 }),
+    email: varchar("email", { length: 255 }),
+    notes: text("notes"),
+    source: varchar("source", { length: 50 }).default("whatsapp"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.businessId, t.phone)],
+);
+
+export const contactTags = mysqlTable(
+  "contact_tags",
+  {
+    contactId: varchar("contact_id", { length: 36 })
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    tag: varchar("tag", { length: 100 }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.contactId, t.tag] })],
+);
+
+// ────────────────────────────────────────────
+// Broadcasts / Campaigns
+// ────────────────────────────────────────────
+
+export const broadcasts = mysqlTable("broadcasts", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  businessId: varchar("business_id", { length: 36 })
+    .notNull()
+    .references(() => businesses.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  templateName: varchar("template_name", { length: 255 }),
+  messageText: text("message_text"),
+  audienceFilter: json("audience_filter").notNull().default({}),
+  status: varchar("status", { length: 20 }).notNull().default("draft"),
+  totalRecipients: int("total_recipients").notNull().default(0),
+  sentCount: int("sent_count").notNull().default(0),
+  failedCount: int("failed_count").notNull().default(0),
+  scheduledAt: timestamp("scheduled_at", { mode: "date" }),
+  sentAt: timestamp("sent_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const broadcastRecipients = mysqlTable("broadcast_recipients", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  broadcastId: varchar("broadcast_id", { length: 36 })
+    .notNull()
+    .references(() => broadcasts.id, { onDelete: "cascade" }),
+  contactPhone: varchar("contact_phone", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  sentAt: timestamp("sent_at", { mode: "date" }),
+  error: text("error"),
+});
+
+// ────────────────────────────────────────────
+// Feedback & Reviews
+// ────────────────────────────────────────────
+
+export const feedback = mysqlTable("feedback", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  businessId: varchar("business_id", { length: 36 })
+    .notNull()
+    .references(() => businesses.id, { onDelete: "cascade" }),
+  appointmentId: varchar("appointment_id", { length: 36 }).references(
+    () => appointments.id,
+  ),
+  customerPhone: varchar("customer_phone", { length: 20 }).notNull(),
+  rating: int("rating"),
+  comment: text("comment"),
+  feedbackSentAt: timestamp("feedback_sent_at", { mode: "date" }),
+  respondedAt: timestamp("responded_at", { mode: "date" }),
+  googleReviewNudgeSent: boolean("google_review_nudge_sent").notNull().default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// ────────────────────────────────────────────
+// Quick Replies
+// ────────────────────────────────────────────
+
+export const quickReplies = mysqlTable("quick_replies", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  businessId: varchar("business_id", { length: 36 })
+    .notNull()
+    .references(() => businesses.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  shortcut: varchar("shortcut", { length: 50 }),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// ────────────────────────────────────────────
+// Business Hours
+// ────────────────────────────────────────────
+
+export const businessHours = mysqlTable(
+  "business_hours",
+  {
+    businessId: varchar("business_id", { length: 36 })
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    dayOfWeek: int("day_of_week").notNull(),
+    openTime: varchar("open_time", { length: 5 }).notNull().default("09:00"),
+    closeTime: varchar("close_time", { length: 5 }).notNull().default("20:00"),
+    isClosed: boolean("is_closed").notNull().default(false),
+  },
+  (t) => [primaryKey({ columns: [t.businessId, t.dayOfWeek] })],
+);
+
+// ────────────────────────────────────────────
 // Billing
 // ────────────────────────────────────────────
 

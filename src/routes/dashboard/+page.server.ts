@@ -7,8 +7,11 @@ import {
   messages,
   appointments,
   escalations,
+  feedback,
+  contacts,
+  broadcasts,
 } from "$lib/server/db/schema.js";
-import { eq, and, sql, gte } from "drizzle-orm";
+import { eq, and, sql, gte, isNotNull } from "drizzle-orm";
 
 export const load: PageServerLoad = async (event) => {
   const session = await event.locals.auth();
@@ -58,6 +61,42 @@ export const load: PageServerLoad = async (event) => {
     .orderBy(sql`${conversations.lastMessageAt} desc`)
     .limit(10);
 
+  const [todayMessages] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(messages)
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+    .where(
+      and(
+        eq(conversations.businessId, business.id),
+        gte(messages.createdAt, todayStart),
+      ),
+    );
+
+  const [contactCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(contacts)
+    .where(eq(contacts.businessId, business.id));
+
+  const [avgRating] = await db
+    .select({ avg: sql<number>`AVG(${feedback.rating})` })
+    .from(feedback)
+    .where(
+      and(
+        eq(feedback.businessId, business.id),
+        isNotNull(feedback.rating),
+      ),
+    );
+
+  const [broadcastCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(broadcasts)
+    .where(
+      and(
+        eq(broadcasts.businessId, business.id),
+        eq(broadcasts.status, "sent"),
+      ),
+    );
+
   return {
     session,
     business,
@@ -65,6 +104,10 @@ export const load: PageServerLoad = async (event) => {
       conversations: Number(conversationCount?.count ?? 0),
       todayBookings: Number(todayBookings?.count ?? 0),
       pendingEscalations: Number(pendingEscalations?.count ?? 0),
+      todayMessages: Number(todayMessages?.count ?? 0),
+      totalContacts: Number(contactCount?.count ?? 0),
+      avgRating: avgRating?.avg ? Math.round(Number(avgRating.avg) * 10) / 10 : null,
+      broadcastsSent: Number(broadcastCount?.count ?? 0),
     },
     recentConversations,
   };

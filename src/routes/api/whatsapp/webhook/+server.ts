@@ -6,7 +6,7 @@ import {
   sendWhatsAppMessage,
 } from "$lib/server/whatsapp.js";
 import { db } from "$lib/server/db/index.js";
-import { businesses, conversations, messages, escalations, businessToneConfig } from "$lib/server/db/schema.js";
+import { businesses, conversations, messages, escalations, businessToneConfig, contacts } from "$lib/server/db/schema.js";
 import { eq, and, sql } from "drizzle-orm";
 import { routeMessage } from "$lib/skills/router.js";
 import type { SkillContext } from "$lib/skills/types.js";
@@ -89,6 +89,25 @@ export const POST: RequestHandler = async ({ request }) => {
         ),
       )
       .limit(1);
+
+    const [existingContact] = await db
+      .select({ id: contacts.id })
+      .from(contacts)
+      .where(
+        and(
+          eq(contacts.businessId, business.id),
+          eq(contacts.phone, incoming.from),
+        ),
+      )
+      .limit(1);
+
+    if (!existingContact) {
+      await db.insert(contacts).values({
+        businessId: business.id,
+        phone: incoming.from,
+        source: "whatsapp",
+      });
+    }
   }
 
   await db.insert(messages).values({
