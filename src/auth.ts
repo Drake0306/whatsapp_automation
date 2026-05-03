@@ -29,10 +29,9 @@ function initAuth(): Handle {
           server: {
             host: env.EMAIL_SERVER_HOST,
             port: Number(env.EMAIL_SERVER_PORT || 587),
-            auth: {
-              user: env.EMAIL_SERVER_USER,
-              pass: env.EMAIL_SERVER_PASSWORD,
-            },
+            ...(env.EMAIL_SERVER_USER
+              ? { auth: { user: env.EMAIL_SERVER_USER, pass: env.EMAIL_SERVER_PASSWORD } }
+              : {}),
           },
           from: env.EMAIL_FROM || "noreply@whatsappflow.app",
         }),
