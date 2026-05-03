@@ -10,12 +10,15 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:reset": "tsx scripts/reset.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
     "@auth/sveltekit": "^1.11.2",
     "@aws-sdk/client-s3": "^3.1041.0",
+    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "mysql2": "^3.22.3",
     "pdfjs-dist": "^5.7.284",
@@ -36,6 +39,7 @@
     "tailwind-merge": "^3.5.0",
     "tailwind-variants": "^3.2.2",
     "tailwindcss": "^4.2.4",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.10"
   }

@@ -86,6 +86,35 @@ npm run db:generate            # generates migration SQL from schema
 npm run db:migrate             # runs migrations against DATABASE_URL
 ```
 
+## Seed (Test Data)
+
+Before seeding, open `scripts/seed.ts` and change `TEST_USER_EMAIL` to your actual email
+(the one you'll use to sign in with Google or Magic Link).
+
+```bash
+npm run db:seed                # populates DB with a test salon business + sample data
+```
+
+This creates:
+- **2 users** (test owner + second owner)
+- **1 business** — "Priya's Salon" (salon vertical, hinglish, active)
+- **Business hours** (Mon-Sat 9AM-8PM, Sun 10AM-6PM)
+- **Tone config** + **7 skills** enabled
+- **6 contacts** with tags (vip, regular, new, referred)
+- **6 conversations** with realistic inbound + bot reply messages
+- **6 appointments** (3 upcoming, 2 completed, 1 no-show)
+- **3 pending escalations** (ready to approve/edit/skip)
+- **2 feedback entries** (4-star and 5-star with comments)
+- **1 sent broadcast** campaign (Diwali Special)
+- **3 quick reply** templates (/welcome, /confirm, /closed)
+- **2 knowledge base** chunks (services + pricing)
+
+To wipe everything and re-seed:
+```bash
+npm run db:reset               # clears all tables (keeps schema)
+npm run db:seed                # re-populate
+```
+
 ## Run
 
 ```bash
