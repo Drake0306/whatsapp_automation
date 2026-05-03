@@ -2,45 +2,56 @@ import { SvelteKitAuth } from "@auth/sveltekit";
 import Google from "@auth/core/providers/google";
 import Nodemailer from "@auth/core/providers/nodemailer";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { db } from "$lib/server/db/index.js";
+import { getDb } from "$lib/server/db/index.js";
 import {
   users,
   accounts,
   sessions,
   verificationTokens,
 } from "$lib/server/db/schema.js";
+import type { Handle } from "@sveltejs/kit";
 
-export const { handle, signIn, signOut } = SvelteKitAuth({
-  adapter: DrizzleAdapter(db, {
-    usersTable: users,
-    accountsTable: accounts,
-    sessionsTable: sessions,
-    verificationTokensTable: verificationTokens,
-  }),
-  providers: [
-    Google,
-    Nodemailer({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST,
-        port: Number(process.env.EMAIL_SERVER_PORT || 587),
-        auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
+let _handle: Handle | null = null;
+
+function initAuth(): Handle {
+  if (!_handle) {
+    const auth = SvelteKitAuth({
+      adapter: DrizzleAdapter(getDb(), {
+        usersTable: users,
+        accountsTable: accounts,
+        sessionsTable: sessions,
+        verificationTokensTable: verificationTokens,
+      }),
+      providers: [
+        Google,
+        Nodemailer({
+          server: {
+            host: process.env.EMAIL_SERVER_HOST,
+            port: Number(process.env.EMAIL_SERVER_PORT || 587),
+            auth: {
+              user: process.env.EMAIL_SERVER_USER,
+              pass: process.env.EMAIL_SERVER_PASSWORD,
+            },
+          },
+          from: process.env.EMAIL_FROM || "noreply@whatsappflow.app",
+        }),
+      ],
+      pages: {
+        signIn: "/auth",
+      },
+      callbacks: {
+        session({ session, user }) {
+          if (session.user) {
+            session.user.id = user.id;
+          }
+          return session;
         },
       },
-      from: process.env.EMAIL_FROM || "noreply@whatsappflow.app",
-    }),
-  ],
-  pages: {
-    signIn: "/auth",
-  },
-  callbacks: {
-    session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
-      }
-      return session;
-    },
-  },
-  trustHost: true,
-});
+      trustHost: true,
+    });
+    _handle = auth.handle;
+  }
+  return _handle;
+}
+
+export const handle: Handle = (input) => initAuth()(input);
