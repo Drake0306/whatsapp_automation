@@ -184,4 +184,6 @@ src/
 
 ## License
 
-Source-available. See LICENSE file for terms.
+This project is licensed under the [Business Source License 1.1](./LICENSE). You may view, modify, and learn from the code, but commercial use requires a paid license from the author. The code converts to GPL v2.0 on 2028-01-01.
+
+Copyright © 2024 Abhinav Roy. All Rights Reserved.
