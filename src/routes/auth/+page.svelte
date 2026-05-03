@@ -3,11 +3,15 @@
 
   let email = $state("");
   let submitted = $state(false);
+  let loading = $state(false);
+  let googleLoading = $state(false);
 
   async function handleEmailSignIn(e: SubmitEvent) {
     e.preventDefault();
     if (!email) return;
+    loading = true;
     await signIn("nodemailer", { email, callbackUrl: "/dashboard" });
+    loading = false;
     submitted = true;
   }
 </script>
@@ -22,10 +26,11 @@
     </div>
 
     <button
-      onclick={() => signIn("google", { callbackUrl: "/dashboard" })}
-      class="flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-3 text-sm font-medium hover:bg-accent"
+      onclick={() => { googleLoading = true; signIn("google", { callbackUrl: "/dashboard" }); }}
+      disabled={googleLoading}
+      class="flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-3 text-sm font-medium hover:bg-accent disabled:opacity-50"
     >
-      Continue with Google
+      {googleLoading ? "Redirecting..." : "Continue with Google"}
     </button>
 
     <div class="relative">
@@ -52,9 +57,10 @@
         />
         <button
           type="submit"
-          class="w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          disabled={loading}
+          class="w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          Send Magic Link
+          {loading ? "Sending..." : "Send Magic Link"}
         </button>
       </form>
     {/if}

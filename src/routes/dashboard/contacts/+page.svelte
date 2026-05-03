@@ -10,6 +10,10 @@
   let showAdd = $state(false);
   let tagInput = $state("");
   let search = $state("");
+  let addingContact = $state(false);
+  let savingNotes = $state(false);
+  let addingTag = $state(false);
+  let removingTag = $state<string | null>(null);
 
   const filtered = $derived(
     search
@@ -53,8 +57,10 @@
           action="?/add-contact"
           class="mt-3 flex flex-wrap gap-3"
           use:enhance={() => {
+            addingContact = true;
             return async ({ update }) => {
               await update();
+              addingContact = false;
               showAdd = false;
             };
           }}
@@ -80,13 +86,15 @@
           />
           <button
             type="submit"
-            class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            disabled={addingContact}
+            class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
-            Save
+            {addingContact ? "Saving..." : "Save"}
           </button>
           <button
             type="button"
             onclick={() => (showAdd = false)}
+            disabled={addingContact}
             class="rounded-md border border-input px-4 py-2 text-sm"
           >
             Cancel
@@ -175,14 +183,21 @@
               <h3 class="text-sm font-medium">Tags</h3>
               <div class="mt-2 flex flex-wrap gap-2">
                 {#each selected.tags as tag}
-                  <form method="POST" action="?/remove-tag" use:enhance>
+                  <form method="POST" action="?/remove-tag" use:enhance={() => {
+                    removingTag = tag;
+                    return async ({ update }) => {
+                      await update();
+                      removingTag = null;
+                    };
+                  }}>
                     <input type="hidden" name="contactId" value={selected.id} />
                     <input type="hidden" name="tag" value={tag} />
                     <button
                       type="submit"
-                      class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs text-blue-800 hover:bg-blue-200"
+                      disabled={removingTag === tag}
+                      class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs text-blue-800 hover:bg-blue-200 disabled:opacity-50"
                     >
-                      {tag} &times;
+                      {removingTag === tag ? "..." : `${tag} ×`}
                     </button>
                   </form>
                 {/each}
@@ -191,8 +206,10 @@
                   action="?/add-tag"
                   class="inline-flex gap-1"
                   use:enhance={() => {
+                    addingTag = true;
                     return async ({ update }) => {
                       await update();
+                      addingTag = false;
                       tagInput = "";
                     };
                   }}
@@ -207,9 +224,10 @@
                   />
                   <button
                     type="submit"
-                    class="rounded-md bg-muted px-2 py-0.5 text-xs hover:bg-accent"
+                    disabled={addingTag}
+                    class="rounded-md bg-muted px-2 py-0.5 text-xs hover:bg-accent disabled:opacity-50"
                   >
-                    +
+                    {addingTag ? "..." : "+"}
                   </button>
                 </form>
               </div>
@@ -221,7 +239,13 @@
               <form
                 method="POST"
                 action="?/update-notes"
-                use:enhance
+                use:enhance={() => {
+                  savingNotes = true;
+                  return async ({ update }) => {
+                    await update();
+                    savingNotes = false;
+                  };
+                }}
                 class="mt-2"
               >
                 <input type="hidden" name="contactId" value={selected.id} />
@@ -234,9 +258,10 @@
                 ></textarea>
                 <button
                   type="submit"
-                  class="mt-2 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  disabled={savingNotes}
+                  class="mt-2 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
-                  Save Notes
+                  {savingNotes ? "Saving..." : "Save Notes"}
                 </button>
               </form>
             </div>

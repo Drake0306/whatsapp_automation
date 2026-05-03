@@ -21,22 +21,22 @@ export const load: PageServerLoad = async (event) => {
 
   if (!business) throw redirect(303, "/onboarding");
 
-  const [tone] = await db
-    .select()
-    .from(businessToneConfig)
-    .where(eq(businessToneConfig.businessId, business.id))
-    .limit(1);
-
-  const skills = await db
-    .select()
-    .from(businessSkills)
-    .where(eq(businessSkills.businessId, business.id));
-
-  const hours = await db
-    .select()
-    .from(businessHours)
-    .where(eq(businessHours.businessId, business.id))
-    .orderBy(businessHours.dayOfWeek);
+  const [[tone], skills, hours] = await Promise.all([
+    db
+      .select()
+      .from(businessToneConfig)
+      .where(eq(businessToneConfig.businessId, business.id))
+      .limit(1),
+    db
+      .select()
+      .from(businessSkills)
+      .where(eq(businessSkills.businessId, business.id)),
+    db
+      .select()
+      .from(businessHours)
+      .where(eq(businessHours.businessId, business.id))
+      .orderBy(businessHours.dayOfWeek),
+  ]);
 
   return { session, business, tone: tone ?? null, skills, hours };
 };

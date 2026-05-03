@@ -8,7 +8,7 @@ import {
   conversations,
   appointments,
 } from "$lib/server/db/schema.js";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, inArray } from "drizzle-orm";
 
 export const load: PageServerLoad = async (event) => {
   const session = await event.locals.auth();
@@ -29,41 +29,68 @@ export const load: PageServerLoad = async (event) => {
     .orderBy(desc(contacts.updatedAt))
     .limit(200);
 
-  const enriched = [];
-  for (const contact of contactList) {
-    const tags = await db
-      .select({ tag: contactTags.tag })
-      .from(contactTags)
-      .where(eq(contactTags.contactId, contact.id));
+  if (contactList.length === 0) {
+    return { session, business, contacts: [], selectedId: event.url.searchParams.get("id") };
+  }
 
-    const [apptCount] = await db
-      .select({ count: sql<number>`count(*)` })
+  const contactIds = contactList.map(c => c.id);
+  const contactPhones = contactList.map(c => c.phone);
+
+  const [allTags, allApptCounts, allConvos] = await Promise.all([
+    db
+      .select({ contactId: contactTags.contactId, tag: contactTags.tag })
+      .from(contactTags)
+      .where(inArray(contactTags.contactId, contactIds)),
+    db
+      .select({
+        customerPhone: appointments.customerPhone,
+        count: sql<number>`count(*)`,
+      })
       .from(appointments)
       .where(
         and(
           eq(appointments.businessId, business.id),
-          eq(appointments.customerPhone, contact.phone),
+          inArray(appointments.customerPhone, contactPhones),
         ),
-      );
-
-    const [convo] = await db
-      .select({ lastMessageAt: conversations.lastMessageAt })
+      )
+      .groupBy(appointments.customerPhone),
+    db
+      .select({
+        customerPhone: conversations.customerPhone,
+        lastMessageAt: conversations.lastMessageAt,
+      })
       .from(conversations)
       .where(
         and(
           eq(conversations.businessId, business.id),
-          eq(conversations.customerPhone, contact.phone),
+          inArray(conversations.customerPhone, contactPhones),
         ),
-      )
-      .limit(1);
+      ),
+  ]);
 
-    enriched.push({
-      ...contact,
-      tags: tags.map((t) => t.tag),
-      appointmentCount: Number(apptCount?.count ?? 0),
-      lastInteraction: convo?.lastMessageAt ?? null,
-    });
+  const tagsByContact = new Map<string, string[]>();
+  for (const t of allTags) {
+    const arr = tagsByContact.get(t.contactId) || [];
+    arr.push(t.tag);
+    tagsByContact.set(t.contactId, arr);
   }
+
+  const apptCountByPhone = new Map<string, number>();
+  for (const a of allApptCounts) {
+    apptCountByPhone.set(a.customerPhone, Number(a.count));
+  }
+
+  const convoByPhone = new Map<string, Date | null>();
+  for (const c of allConvos) {
+    convoByPhone.set(c.customerPhone, c.lastMessageAt);
+  }
+
+  const enriched = contactList.map(contact => ({
+    ...contact,
+    tags: tagsByContact.get(contact.id) || [],
+    appointmentCount: apptCountByPhone.get(contact.phone) || 0,
+    lastInteraction: convoByPhone.get(contact.phone) ?? null,
+  }));
 
   const selectedId = event.url.searchParams.get("id");
 

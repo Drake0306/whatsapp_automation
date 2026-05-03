@@ -30,8 +30,13 @@ export const load: PageServerLoad = async (event) => {
       status: escalations.status,
       createdAt: escalations.createdAt,
       messageId: escalations.messageId,
+      customerMessage: messages.text,
+      conversationId: messages.conversationId,
+      customerPhone: conversations.customerPhone,
     })
     .from(escalations)
+    .innerJoin(messages, eq(escalations.messageId, messages.id))
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
     .where(
       and(
         eq(escalations.businessId, business.id),
@@ -41,34 +46,17 @@ export const load: PageServerLoad = async (event) => {
     .orderBy(sql`${escalations.createdAt} desc`)
     .limit(50);
 
-  const enriched = [];
-  for (const esc of pending) {
-    const [msg] = await db
-      .select({
-        text: messages.text,
-        conversationId: messages.conversationId,
-      })
-      .from(messages)
-      .where(eq(messages.id, esc.messageId))
-      .limit(1);
-
-    let customerPhone = "";
-    if (msg) {
-      const [convo] = await db
-        .select({ customerPhone: conversations.customerPhone })
-        .from(conversations)
-        .where(eq(conversations.id, msg.conversationId))
-        .limit(1);
-      customerPhone = convo?.customerPhone ?? "";
-    }
-
-    enriched.push({
-      ...esc,
-      customerMessage: msg?.text ?? "",
-      customerPhone,
-      conversationId: msg?.conversationId ?? "",
-    });
-  }
+  const enriched = pending.map(esc => ({
+    id: esc.id,
+    proposedReply: esc.proposedReply,
+    confidence: esc.confidence,
+    status: esc.status,
+    createdAt: esc.createdAt,
+    messageId: esc.messageId,
+    customerMessage: esc.customerMessage ?? "",
+    customerPhone: esc.customerPhone ?? "",
+    conversationId: esc.conversationId ?? "",
+  }));
 
   return { session, business, escalations: enriched };
 };

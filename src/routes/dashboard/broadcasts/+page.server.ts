@@ -23,24 +23,24 @@ export const load: PageServerLoad = async (event) => {
 
   if (!business) throw redirect(303, "/onboarding");
 
-  const campaigns = await db
-    .select()
-    .from(broadcasts)
-    .where(eq(broadcasts.businessId, business.id))
-    .orderBy(desc(broadcasts.createdAt))
-    .limit(50);
-
-  const allTags = await db
-    .select({ tag: contactTags.tag })
-    .from(contactTags)
-    .innerJoin(contacts, eq(contactTags.contactId, contacts.id))
-    .where(eq(contacts.businessId, business.id))
-    .groupBy(contactTags.tag);
-
-  const [contactCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(contacts)
-    .where(eq(contacts.businessId, business.id));
+  const [campaigns, allTags, [contactCount]] = await Promise.all([
+    db
+      .select()
+      .from(broadcasts)
+      .where(eq(broadcasts.businessId, business.id))
+      .orderBy(desc(broadcasts.createdAt))
+      .limit(50),
+    db
+      .select({ tag: contactTags.tag })
+      .from(contactTags)
+      .innerJoin(contacts, eq(contactTags.contactId, contacts.id))
+      .where(eq(contacts.businessId, business.id))
+      .groupBy(contactTags.tag),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(contacts)
+      .where(eq(contacts.businessId, business.id)),
+  ]);
 
   return {
     session,

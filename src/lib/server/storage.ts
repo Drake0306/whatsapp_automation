@@ -6,25 +6,30 @@ import {
 } from "@aws-sdk/client-s3";
 import { env } from "$env/dynamic/private";
 
+let _r2Client: S3Client | null = null;
+
 function getR2Client() {
-  const accountId = env.R2_ACCOUNT_ID;
-  const accessKeyId = env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = env.R2_SECRET_ACCESS_KEY;
+  if (!_r2Client) {
+    const accountId = env.R2_ACCOUNT_ID;
+    const accessKeyId = env.R2_ACCESS_KEY_ID;
+    const secretAccessKey = env.R2_SECRET_ACCESS_KEY;
 
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    throw new Error(
-      "R2 credentials not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY.",
-    );
+    if (!accountId || !accessKeyId || !secretAccessKey) {
+      throw new Error(
+        "R2 credentials not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY.",
+      );
+    }
+
+    _r2Client = new S3Client({
+      region: "auto",
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    });
   }
-
-  return new S3Client({
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId,
-      secretAccessKey,
-    },
-  });
+  return _r2Client;
 }
 
 function getBucketName() {

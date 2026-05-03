@@ -24,95 +24,87 @@ export const load: PageServerLoad = async (event) => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // Bookings per day (last 30 days)
-  const bookingsPerDay = await db
-    .select({
-      date: sql<string>`DATE(${appointments.slotAt})`,
-      count: sql<number>`count(*)`,
-    })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.businessId, business.id),
-        gte(appointments.slotAt, thirtyDaysAgo),
+  const [bookingsPerDay, [totalCompleted], [noShows], convosPerDay, messagesBySkill, statusBreakdown] = await Promise.all([
+    db
+      .select({
+        date: sql<string>`DATE(${appointments.slotAt})`,
+        count: sql<number>`count(*)`,
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.businessId, business.id),
+          gte(appointments.slotAt, thirtyDaysAgo),
+        ),
+      )
+      .groupBy(sql`DATE(${appointments.slotAt})`)
+      .orderBy(sql`DATE(${appointments.slotAt})`),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.businessId, business.id),
+          gte(appointments.slotAt, thirtyDaysAgo),
+        ),
       ),
-    )
-    .groupBy(sql`DATE(${appointments.slotAt})`)
-    .orderBy(sql`DATE(${appointments.slotAt})`);
-
-  // No-show rate
-  const [totalCompleted] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.businessId, business.id),
-        gte(appointments.slotAt, thirtyDaysAgo),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.businessId, business.id),
+          eq(appointments.status, "no_show"),
+          gte(appointments.slotAt, thirtyDaysAgo),
+        ),
       ),
-    );
-
-  const [noShows] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.businessId, business.id),
-        eq(appointments.status, "no_show"),
-        gte(appointments.slotAt, thirtyDaysAgo),
-      ),
-    );
+    db
+      .select({
+        date: sql<string>`DATE(${conversations.lastMessageAt})`,
+        count: sql<number>`count(*)`,
+      })
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.businessId, business.id),
+          gte(conversations.lastMessageAt, thirtyDaysAgo),
+        ),
+      )
+      .groupBy(sql`DATE(${conversations.lastMessageAt})`)
+      .orderBy(sql`DATE(${conversations.lastMessageAt})`),
+    db
+      .select({
+        skillId: messages.skillId,
+        count: sql<number>`count(*)`,
+      })
+      .from(messages)
+      .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+      .where(
+        and(
+          eq(conversations.businessId, business.id),
+          eq(messages.direction, "out"),
+          gte(messages.createdAt, thirtyDaysAgo),
+        ),
+      )
+      .groupBy(messages.skillId),
+    db
+      .select({
+        status: appointments.status,
+        count: sql<number>`count(*)`,
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.businessId, business.id),
+          gte(appointments.slotAt, thirtyDaysAgo),
+        ),
+      )
+      .groupBy(appointments.status),
+  ]);
 
   const totalAppts = Number(totalCompleted?.count ?? 0);
   const noShowCount = Number(noShows?.count ?? 0);
   const noShowRate = totalAppts > 0 ? Math.round((noShowCount / totalAppts) * 100) : 0;
-
-  // Conversations per day (last 30 days)
-  const convosPerDay = await db
-    .select({
-      date: sql<string>`DATE(${conversations.lastMessageAt})`,
-      count: sql<number>`count(*)`,
-    })
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.businessId, business.id),
-        gte(conversations.lastMessageAt, thirtyDaysAgo),
-      ),
-    )
-    .groupBy(sql`DATE(${conversations.lastMessageAt})`)
-    .orderBy(sql`DATE(${conversations.lastMessageAt})`);
-
-  // Messages by skill
-  const messagesBySkill = await db
-    .select({
-      skillId: messages.skillId,
-      count: sql<number>`count(*)`,
-    })
-    .from(messages)
-    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
-    .where(
-      and(
-        eq(conversations.businessId, business.id),
-        eq(messages.direction, "out"),
-        gte(messages.createdAt, thirtyDaysAgo),
-      ),
-    )
-    .groupBy(messages.skillId);
-
-  // Status breakdown
-  const statusBreakdown = await db
-    .select({
-      status: appointments.status,
-      count: sql<number>`count(*)`,
-    })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.businessId, business.id),
-        gte(appointments.slotAt, thirtyDaysAgo),
-      ),
-    )
-    .groupBy(appointments.status);
 
   return {
     session,

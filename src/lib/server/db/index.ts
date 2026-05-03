@@ -11,7 +11,13 @@ export function getDb() {
     if (!url) {
       throw new Error("DATABASE_URL environment variable is not set");
     }
-    const pool = mysql.createPool({ uri: url });
+    const pool = mysql.createPool({
+      uri: url,
+      waitForConnections: true,
+      connectionLimit: 10,
+      idleTimeout: 30000,
+      enableKeepAlive: true,
+    });
     _db = drizzle(pool, { schema, mode: "default" });
   }
   return _db;

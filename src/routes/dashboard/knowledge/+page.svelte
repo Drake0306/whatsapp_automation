@@ -7,6 +7,7 @@
 
   let fileInput = $state<HTMLInputElement>(null!);
   let uploading = $state(false);
+  let deletingSource = $state<string | null>(null);
 
   async function handleUpload() {
     if (!fileInput?.files?.length) return;
@@ -80,13 +81,20 @@
                   : ""}
               </p>
             </div>
-            <form method="POST" action="?/delete" use:enhance>
+            <form method="POST" action="?/delete" use:enhance={() => {
+              deletingSource = doc.source;
+              return async ({ update }) => {
+                await update();
+                deletingSource = null;
+              };
+            }}>
               <input type="hidden" name="source" value={doc.source} />
               <button
                 type="submit"
-                class="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                disabled={deletingSource === doc.source}
+                class="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
               >
-                Delete
+                {deletingSource === doc.source ? "Deleting..." : "Delete"}
               </button>
             </form>
           </div>

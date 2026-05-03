@@ -9,6 +9,7 @@ import {
   float,
   primaryKey,
   unique,
+  index,
 } from "drizzle-orm/mysql-core";
 
 // ────────────────────────────────────────────
@@ -83,7 +84,7 @@ export const businesses = mysqlTable("businesses", {
   whatsappPhoneNumberId: varchar("whatsapp_phone_number_id", { length: 255 }).unique(),
   status: varchar("status", { length: 20 }).notNull().default("onboarding"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (t) => [index("businesses_owner_idx").on(t.ownerUserId)]);
 
 export const conversations = mysqlTable(
   "conversations",
@@ -100,7 +101,7 @@ export const conversations = mysqlTable(
     state: json("state").notNull().default({}),
     lastMessageAt: timestamp("last_message_at", { mode: "date" }),
   },
-  (t) => [unique().on(t.businessId, t.customerPhone)],
+  (t) => [unique().on(t.businessId, t.customerPhone), index("conversations_business_idx").on(t.businessId), index("conversations_last_message_idx").on(t.lastMessageAt)],
 );
 
 export const messages = mysqlTable("messages", {
@@ -117,7 +118,7 @@ export const messages = mysqlTable("messages", {
   skillId: varchar("skill_id", { length: 50 }),
   needsReview: boolean("needs_review").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (t) => [index("messages_conversation_idx").on(t.conversationId), index("messages_created_idx").on(t.createdAt)]);
 
 // ────────────────────────────────────────────
 // Phase 1 tables
@@ -159,7 +160,7 @@ export const businessDocs = mysqlTable("business_docs", {
   metadata: json("metadata").notNull().default({}),
   storageKey: varchar("storage_key", { length: 500 }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (t) => [index("business_docs_business_idx").on(t.businessId)]);
 
 export const appointments = mysqlTable("appointments", {
   id: varchar("id", { length: 36 })
@@ -181,7 +182,7 @@ export const appointments = mysqlTable("appointments", {
   rebookNudgeSentAt: timestamp("rebook_nudge_sent_at", { mode: "date" }),
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (t) => [index("appointments_business_idx").on(t.businessId), index("appointments_business_status_idx").on(t.businessId, t.status), index("appointments_slot_idx").on(t.slotAt)]);
 
 export const escalations = mysqlTable("escalations", {
   id: varchar("id", { length: 36 })
@@ -198,7 +199,7 @@ export const escalations = mysqlTable("escalations", {
   status: varchar("status", { length: 20 }).notNull().default("pending"),
   reviewedAt: timestamp("reviewed_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (t) => [index("escalations_business_idx").on(t.businessId), index("escalations_business_status_idx").on(t.businessId, t.status)]);
 
 // ────────────────────────────────────────────
 // Contacts / CRM
@@ -221,7 +222,7 @@ export const contacts = mysqlTable(
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.businessId, t.phone)],
+  (t) => [unique().on(t.businessId, t.phone), index("contacts_business_idx").on(t.businessId)],
 );
 
 export const contactTags = mysqlTable(
@@ -232,7 +233,7 @@ export const contactTags = mysqlTable(
       .references(() => contacts.id, { onDelete: "cascade" }),
     tag: varchar("tag", { length: 100 }).notNull(),
   },
-  (t) => [primaryKey({ columns: [t.contactId, t.tag] })],
+  (t) => [primaryKey({ columns: [t.contactId, t.tag] }), index("contact_tags_contact_idx").on(t.contactId)],
 );
 
 // ────────────────────────────────────────────
@@ -257,7 +258,7 @@ export const broadcasts = mysqlTable("broadcasts", {
   scheduledAt: timestamp("scheduled_at", { mode: "date" }),
   sentAt: timestamp("sent_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (t) => [index("broadcasts_business_idx").on(t.businessId)]);
 
 export const broadcastRecipients = mysqlTable("broadcast_recipients", {
   id: varchar("id", { length: 36 })
@@ -270,7 +271,7 @@ export const broadcastRecipients = mysqlTable("broadcast_recipients", {
   status: varchar("status", { length: 20 }).notNull().default("pending"),
   sentAt: timestamp("sent_at", { mode: "date" }),
   error: text("error"),
-});
+}, (t) => [index("broadcast_recipients_broadcast_idx").on(t.broadcastId), index("broadcast_recipients_broadcast_status_idx").on(t.broadcastId, t.status)]);
 
 // ────────────────────────────────────────────
 // Feedback & Reviews
@@ -293,7 +294,7 @@ export const feedback = mysqlTable("feedback", {
   respondedAt: timestamp("responded_at", { mode: "date" }),
   googleReviewNudgeSent: boolean("google_review_nudge_sent").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (t) => [index("feedback_business_idx").on(t.businessId), index("feedback_business_rating_idx").on(t.businessId, t.rating)]);
 
 // ────────────────────────────────────────────
 // Quick Replies
@@ -310,7 +311,7 @@ export const quickReplies = mysqlTable("quick_replies", {
   shortcut: varchar("shortcut", { length: 50 }),
   body: text("body").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (t) => [index("quick_replies_business_idx").on(t.businessId)]);
 
 // ────────────────────────────────────────────
 // Business Hours
@@ -347,4 +348,4 @@ export const subscriptions = mysqlTable("subscriptions", {
   status: varchar("status", { length: 20 }).notNull().default("created"),
   currentPeriodEnd: timestamp("current_period_end", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (t) => [index("subscriptions_business_idx").on(t.businessId)]);

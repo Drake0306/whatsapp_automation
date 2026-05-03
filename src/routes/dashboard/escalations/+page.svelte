@@ -6,6 +6,9 @@
 
   let editingId = $state<string | null>(null);
   let editText = $state("");
+  let approvingId = $state<string | null>(null);
+  let skippingId = $state<string | null>(null);
+  let rewriting = $state(false);
 
   function startEdit(id: string, text: string) {
     editingId = id;
@@ -58,8 +61,10 @@
 
                 {#if editingId === esc.id}
                   <form method="POST" action="?/rewrite" use:enhance={() => {
+                    rewriting = true;
                     return async ({ update }) => {
                       await update();
+                      rewriting = false;
                       cancelEdit();
                     };
                   }}>
@@ -73,13 +78,15 @@
                     <div class="mt-2 flex gap-2">
                       <button
                         type="submit"
-                        class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                        disabled={rewriting}
+                        class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                       >
-                        Send Edited
+                        {rewriting ? "Sending..." : "Send Edited"}
                       </button>
                       <button
                         type="button"
                         onclick={cancelEdit}
+                        disabled={rewriting}
                         class="rounded-md border border-input px-3 py-1.5 text-xs hover:bg-accent"
                       >
                         Cancel
@@ -97,13 +104,20 @@
 
             {#if editingId !== esc.id}
               <div class="mt-3 flex gap-2">
-                <form method="POST" action="?/approve" use:enhance>
+                <form method="POST" action="?/approve" use:enhance={() => {
+                  approvingId = esc.id;
+                  return async ({ update }) => {
+                    await update();
+                    approvingId = null;
+                  };
+                }}>
                   <input type="hidden" name="escalationId" value={esc.id} />
                   <button
                     type="submit"
-                    class="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                    disabled={approvingId === esc.id}
+                    class="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
                   >
-                    Approve & Send
+                    {approvingId === esc.id ? "Sending..." : "Approve & Send"}
                   </button>
                 </form>
                 <button
@@ -113,13 +127,20 @@
                 >
                   Edit
                 </button>
-                <form method="POST" action="?/skip" use:enhance>
+                <form method="POST" action="?/skip" use:enhance={() => {
+                  skippingId = esc.id;
+                  return async ({ update }) => {
+                    await update();
+                    skippingId = null;
+                  };
+                }}>
                   <input type="hidden" name="escalationId" value={esc.id} />
                   <button
                     type="submit"
-                    class="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+                    disabled={skippingId === esc.id}
+                    class="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent disabled:opacity-50"
                   >
-                    Skip
+                    {skippingId === esc.id ? "Skipping..." : "Skip"}
                   </button>
                 </form>
               </div>

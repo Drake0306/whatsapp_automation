@@ -29,9 +29,11 @@ function initAuth(): Handle {
           server: {
             host: env.EMAIL_SERVER_HOST,
             port: Number(env.EMAIL_SERVER_PORT || 587),
-            ...(env.EMAIL_SERVER_USER
-              ? { auth: { user: env.EMAIL_SERVER_USER, pass: env.EMAIL_SERVER_PASSWORD } }
-              : {}),
+            secure: Number(env.EMAIL_SERVER_PORT || 587) === 465,
+            auth: env.EMAIL_SERVER_USER
+              ? { user: env.EMAIL_SERVER_USER, pass: env.EMAIL_SERVER_PASSWORD }
+              : (false as any),
+            tls: { rejectUnauthorized: env.NODE_ENV === "production" },
           },
           from: env.EMAIL_FROM || "noreply@whatsappflow.app",
         }),

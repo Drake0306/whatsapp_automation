@@ -16,61 +16,59 @@ export const load: PageServerLoad = async (event) => {
 
   if (!business) throw redirect(303, "/onboarding");
 
-  const responses = await db
-    .select()
-    .from(feedback)
-    .where(
-      and(
-        eq(feedback.businessId, business.id),
-        isNotNull(feedback.rating),
+  const [responses, [avgRating], [totalSent], [totalResponded], ratingDistribution] = await Promise.all([
+    db
+      .select()
+      .from(feedback)
+      .where(
+        and(
+          eq(feedback.businessId, business.id),
+          isNotNull(feedback.rating),
+        ),
+      )
+      .orderBy(desc(feedback.respondedAt))
+      .limit(100),
+    db
+      .select({ avg: sql<number>`AVG(${feedback.rating})` })
+      .from(feedback)
+      .where(
+        and(
+          eq(feedback.businessId, business.id),
+          isNotNull(feedback.rating),
+        ),
       ),
-    )
-    .orderBy(desc(feedback.respondedAt))
-    .limit(100);
-
-  const [avgRating] = await db
-    .select({ avg: sql<number>`AVG(${feedback.rating})` })
-    .from(feedback)
-    .where(
-      and(
-        eq(feedback.businessId, business.id),
-        isNotNull(feedback.rating),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(feedback)
+      .where(
+        and(
+          eq(feedback.businessId, business.id),
+          isNotNull(feedback.feedbackSentAt),
+        ),
       ),
-    );
-
-  const [totalSent] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(feedback)
-    .where(
-      and(
-        eq(feedback.businessId, business.id),
-        isNotNull(feedback.feedbackSentAt),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(feedback)
+      .where(
+        and(
+          eq(feedback.businessId, business.id),
+          isNotNull(feedback.respondedAt),
+        ),
       ),
-    );
-
-  const [totalResponded] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(feedback)
-    .where(
-      and(
-        eq(feedback.businessId, business.id),
-        isNotNull(feedback.respondedAt),
-      ),
-    );
-
-  const ratingDistribution = await db
-    .select({
-      rating: feedback.rating,
-      count: sql<number>`count(*)`,
-    })
-    .from(feedback)
-    .where(
-      and(
-        eq(feedback.businessId, business.id),
-        isNotNull(feedback.rating),
-      ),
-    )
-    .groupBy(feedback.rating);
+    db
+      .select({
+        rating: feedback.rating,
+        count: sql<number>`count(*)`,
+      })
+      .from(feedback)
+      .where(
+        and(
+          eq(feedback.businessId, business.id),
+          isNotNull(feedback.rating),
+        ),
+      )
+      .groupBy(feedback.rating),
+  ]);
 
   return {
     session,

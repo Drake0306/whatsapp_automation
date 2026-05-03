@@ -29,73 +29,25 @@ export const load: PageServerLoad = async (event) => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const [conversationCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(conversations)
-    .where(eq(conversations.businessId, business.id));
-
-  const [todayBookings] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.businessId, business.id),
-        gte(appointments.slotAt, todayStart),
-      ),
-    );
-
-  const [pendingEscalations] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(escalations)
-    .where(
-      and(
-        eq(escalations.businessId, business.id),
-        eq(escalations.status, "pending"),
-      ),
-    );
-
-  const recentConversations = await db
-    .select()
-    .from(conversations)
-    .where(eq(conversations.businessId, business.id))
-    .orderBy(sql`${conversations.lastMessageAt} desc`)
-    .limit(10);
-
-  const [todayMessages] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(messages)
-    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
-    .where(
-      and(
-        eq(conversations.businessId, business.id),
-        gte(messages.createdAt, todayStart),
-      ),
-    );
-
-  const [contactCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(contacts)
-    .where(eq(contacts.businessId, business.id));
-
-  const [avgRating] = await db
-    .select({ avg: sql<number>`AVG(${feedback.rating})` })
-    .from(feedback)
-    .where(
-      and(
-        eq(feedback.businessId, business.id),
-        isNotNull(feedback.rating),
-      ),
-    );
-
-  const [broadcastCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(broadcasts)
-    .where(
-      and(
-        eq(broadcasts.businessId, business.id),
-        eq(broadcasts.status, "sent"),
-      ),
-    );
+  const [
+    [conversationCount],
+    [todayBookings],
+    [pendingEscalations],
+    recentConversations,
+    [todayMessages],
+    [contactCount],
+    [avgRating],
+    [broadcastCount],
+  ] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(conversations).where(eq(conversations.businessId, business.id)),
+    db.select({ count: sql<number>`count(*)` }).from(appointments).where(and(eq(appointments.businessId, business.id), gte(appointments.slotAt, todayStart))),
+    db.select({ count: sql<number>`count(*)` }).from(escalations).where(and(eq(escalations.businessId, business.id), eq(escalations.status, "pending"))),
+    db.select().from(conversations).where(eq(conversations.businessId, business.id)).orderBy(sql`${conversations.lastMessageAt} desc`).limit(10),
+    db.select({ count: sql<number>`count(*)` }).from(messages).innerJoin(conversations, eq(messages.conversationId, conversations.id)).where(and(eq(conversations.businessId, business.id), gte(messages.createdAt, todayStart))),
+    db.select({ count: sql<number>`count(*)` }).from(contacts).where(eq(contacts.businessId, business.id)),
+    db.select({ avg: sql<number>`AVG(${feedback.rating})` }).from(feedback).where(and(eq(feedback.businessId, business.id), isNotNull(feedback.rating))),
+    db.select({ count: sql<number>`count(*)` }).from(broadcasts).where(and(eq(broadcasts.businessId, business.id), eq(broadcasts.status, "sent"))),
+  ]);
 
   return {
     session,

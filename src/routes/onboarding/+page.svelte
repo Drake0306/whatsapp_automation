@@ -469,12 +469,19 @@
           >
             Back
           </button>
-          <form method="POST" action="?/activate" use:enhance>
+          <form method="POST" action="?/activate" use:enhance={() => {
+            saving = true;
+            return async ({ update }) => {
+              await update();
+              saving = false;
+            };
+          }}>
             <button
               type="submit"
-              class="rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              disabled={saving}
+              class="rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              Go Live
+              {saving ? "Activating..." : "Go Live"}
             </button>
           </form>
         </div>

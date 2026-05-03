@@ -10,6 +10,7 @@
   let showCreate = $state(false);
   let sending = $state<string | null>(null);
   let useTemplate = $state(false);
+  let creating = $state(false);
 </script>
 
 <div class="min-h-screen">
@@ -55,8 +56,10 @@
           action="?/create"
           class="mt-4 space-y-4"
           use:enhance={() => {
+            creating = true;
             return async ({ update }) => {
               await update();
+              creating = false;
               showCreate = false;
             };
           }}
@@ -131,13 +134,15 @@
           <div class="flex gap-3">
             <button
               type="submit"
-              class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              disabled={creating}
+              class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              Create Draft
+              {creating ? "Creating..." : "Create Draft"}
             </button>
             <button
               type="button"
               onclick={() => (showCreate = false)}
+              disabled={creating}
               class="rounded-md border border-input px-4 py-2 text-sm"
             >
               Cancel
@@ -179,13 +184,20 @@
                     {campaign.status}
                   </span>
                   {#if campaign.status === "draft"}
-                    <form method="POST" action="?/send" use:enhance>
+                    <form method="POST" action="?/send" use:enhance={() => {
+                      sending = campaign.id;
+                      return async ({ update }) => {
+                        await update();
+                        sending = null;
+                      };
+                    }}>
                       <input type="hidden" name="broadcastId" value={campaign.id} />
                       <button
                         type="submit"
-                        class="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700"
+                        disabled={sending === campaign.id}
+                        class="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
                       >
-                        Send Now
+                        {sending === campaign.id ? "Sending..." : "Send Now"}
                       </button>
                     </form>
                   {/if}

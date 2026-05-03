@@ -8,6 +8,10 @@
   const hours = $derived($page.data.hours ?? []);
 
   let saved = $state<string | null>(null);
+  let savingBusiness = $state(false);
+  let savingTone = $state(false);
+  let savingHours = $state(false);
+  let togglingSkill = $state<string | null>(null);
 
   const LANGUAGES = [
     { value: "en", label: "English" },
@@ -52,8 +56,10 @@
         action="?/update-business"
         class="mt-4 space-y-4"
         use:enhance={() => {
+          savingBusiness = true;
           return async ({ update }) => {
             await update();
+            savingBusiness = false;
             saved = "business";
             setTimeout(() => (saved = null), 2000);
           };
@@ -96,8 +102,8 @@
         </div>
 
         <div class="flex items-center gap-3">
-          <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            Save
+          <button type="submit" disabled={savingBusiness} class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            {savingBusiness ? "Saving..." : "Save"}
           </button>
           {#if saved === "business"}
             <span class="text-sm text-green-600">Saved!</span>
@@ -116,8 +122,10 @@
         action="?/update-tone"
         class="mt-4 space-y-4"
         use:enhance={() => {
+          savingTone = true;
           return async ({ update }) => {
             await update();
+            savingTone = false;
             saved = "tone";
             setTimeout(() => (saved = null), 2000);
           };
@@ -161,8 +169,8 @@
         </div>
 
         <div class="flex items-center gap-3">
-          <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            Save
+          <button type="submit" disabled={savingTone} class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            {savingTone ? "Saving..." : "Save"}
           </button>
           {#if saved === "tone"}
             <span class="text-sm text-green-600">Saved!</span>
@@ -182,8 +190,10 @@
         action="?/update-hours"
         class="mt-4 space-y-3"
         use:enhance={() => {
+          savingHours = true;
           return async ({ update }) => {
             await update();
+            savingHours = false;
             saved = "hours";
             setTimeout(() => (saved = null), 2000);
           };
@@ -219,8 +229,8 @@
           </div>
         {/each}
         <div class="flex items-center gap-3">
-          <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            Save Hours
+          <button type="submit" disabled={savingHours} class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            {savingHours ? "Saving..." : "Save Hours"}
           </button>
           {#if saved === "hours"}
             <span class="text-sm text-green-600">Saved!</span>
@@ -240,17 +250,25 @@
         {#each skills as skill}
           <div class="flex items-center justify-between rounded-lg border px-4 py-3">
             <span class="text-sm">{SKILL_LABELS[skill.skillId] ?? skill.skillId}</span>
-            <form method="POST" action="?/toggle-skill" use:enhance>
+            <form method="POST" action="?/toggle-skill" use:enhance={() => {
+              togglingSkill = skill.skillId;
+              return async ({ update }) => {
+                await update();
+                togglingSkill = null;
+              };
+            }}>
               <input type="hidden" name="skillId" value={skill.skillId} />
               <input type="hidden" name="enabled" value={String(!skill.enabled)} />
               <button
                 type="submit"
+                disabled={togglingSkill === skill.skillId}
                 class="rounded-full px-3 py-1 text-xs font-medium
                   {skill.enabled
                     ? 'bg-green-100 text-green-800'
-                    : 'bg-muted text-muted-foreground'}"
+                    : 'bg-muted text-muted-foreground'}
+                  disabled:opacity-50"
               >
-                {skill.enabled ? "Enabled" : "Disabled"}
+                {togglingSkill === skill.skillId ? "..." : skill.enabled ? "Enabled" : "Disabled"}
               </button>
             </form>
           </div>
