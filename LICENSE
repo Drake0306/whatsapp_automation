@@ -1,0 +1,52 @@
+Copyright © 2024 Abhinav Roy. All Rights Reserved.
+“Business Source License” is a trademark of MariaDB plc.
+
+BUSINESS SOURCE LICENSE TERMS
+
+The Licensor hereby grants you the right to copy, modify, create derivative works, redistribute, and make non-production use of the Licensed Work. 
+
+Additional Use Grant:
+You may use this software in production for personal or internal business use. You may not provide this software as a hosted or managed service, or use it to compete with the Licensor’s product.
+
+Change Date: 2028-01-01
+
+Change License: GNU General Public License v2.0 or later
+
+
+---
+
+FULL LICENSE TEXT
+
+The Licensor hereby grants you the right to copy, modify, create derivative works, redistribute, and make non-production use of the Licensed Work. The Licensor may make an Additional Use Grant permitting limited production use.
+
+Effective on the Change Date, or the fourth anniversary of the first publicly available distribution of a specific version of the Licensed Work under this License, whichever comes first, the Licensor hereby grants you rights under the terms of the Change License, and the rights granted above terminate.
+
+If your use of the Licensed Work does not comply with the requirements currently in effect as described in this License, you must purchase a commercial license from the Licensor or refrain from using the Licensed Work.
+
+All copies of the original and modified Licensed Work, and derivative works of the Licensed Work, are subject to this License. This License applies separately for each version of the Licensed Work, and the Change Date may vary for each version released by the Licensor.
+
+You must conspicuously display this License on each original or modified copy of the Licensed Work. If you receive the Licensed Work from a third party, the terms and conditions of this License apply to your use of that work.
+
+Any use of the Licensed Work in violation of this License will automatically terminate your rights under this License.
+
+This License does not grant you any right in any trademark or logo of the Licensor or its affiliates (except as required by this License).
+
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS PROVIDED ON AN “AS IS” BASIS. THE LICENSOR DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND TITLE.
+
+The Licensor grants permission to use this License’s text and the name “Business Source License” as long as the Covenants of Licensor are followed.
+
+
+COVENANTS OF LICENSOR
+
+The Licensor covenants to MariaDB and to all recipients of the Licensed Work:
+
+1. To specify the Change License as GPL v2.0 or later (or a compatible license).
+2. To provide an Additional Use Grant or specify “None”.
+3. Not to modify this License in any other way.
+
+
+---
+
+NOTICE
+
+This Business Source License is not an Open Source license. The Licensed Work will become Open Source on the Change Date defined above.
