@@ -10,15 +10,14 @@ import { businesses, conversations, messages, escalations, businessToneConfig, c
 import { eq, and, sql } from "drizzle-orm";
 import { routeMessage } from "$lib/skills/router.js";
 import type { SkillContext } from "$lib/skills/types.js";
-
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+import { env } from "$env/dynamic/private";
 
 export const GET: RequestHandler = async ({ url }) => {
   const mode = url.searchParams.get("hub.mode");
   const token = url.searchParams.get("hub.verify_token");
   const challenge = url.searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+  if (mode === "subscribe" && token === env.WHATSAPP_VERIFY_TOKEN) {
     return text(challenge ?? "", { status: 200 });
   }
 
@@ -29,7 +28,7 @@ export const POST: RequestHandler = async ({ request }) => {
   const rawBody = await request.text();
 
   const signature = request.headers.get("x-hub-signature-256");
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  const appSecret = env.WHATSAPP_APP_SECRET;
   if (!appSecret) {
     console.warn("[webhook] WHATSAPP_APP_SECRET not set — signature verification disabled");
   } else if (!verifyWebhookSignature(rawBody, signature, appSecret)) {

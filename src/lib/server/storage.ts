@@ -4,14 +4,14 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
-
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "whatsappflow-uploads";
+import { env } from "$env/dynamic/private";
 
 function getR2Client() {
-  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
+  const accountId = env.R2_ACCOUNT_ID;
+  const accessKeyId = env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = env.R2_SECRET_ACCESS_KEY;
+
+  if (!accountId || !accessKeyId || !secretAccessKey) {
     throw new Error(
       "R2 credentials not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY.",
     );
@@ -19,12 +19,16 @@ function getR2Client() {
 
   return new S3Client({
     region: "auto",
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: {
-      accessKeyId: R2_ACCESS_KEY_ID,
-      secretAccessKey: R2_SECRET_ACCESS_KEY,
+      accessKeyId,
+      secretAccessKey,
     },
   });
+}
+
+function getBucketName() {
+  return env.R2_BUCKET_NAME || "whatsappflow-uploads";
 }
 
 export async function uploadFile(
@@ -35,7 +39,7 @@ export async function uploadFile(
   const client = getR2Client();
   await client.send(
     new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME,
+      Bucket: getBucketName(),
       Key: key,
       Body: body,
       ContentType: contentType,
@@ -50,7 +54,7 @@ export async function getFile(
   const client = getR2Client();
   const response = await client.send(
     new GetObjectCommand({
-      Bucket: R2_BUCKET_NAME,
+      Bucket: getBucketName(),
       Key: key,
     }),
   );
@@ -61,7 +65,7 @@ export async function deleteFile(key: string): Promise<void> {
   const client = getR2Client();
   await client.send(
     new DeleteObjectCommand({
-      Bucket: R2_BUCKET_NAME,
+      Bucket: getBucketName(),
       Key: key,
     }),
   );

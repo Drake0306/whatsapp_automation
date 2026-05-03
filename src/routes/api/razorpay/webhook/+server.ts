@@ -4,11 +4,12 @@ import { verifyWebhookSignature } from "$lib/server/razorpay.js";
 import { db } from "$lib/server/db/index.js";
 import { subscriptions } from "$lib/server/db/schema.js";
 import { eq } from "drizzle-orm";
+import { env } from "$env/dynamic/private";
 
 export const POST: RequestHandler = async ({ request }) => {
   const rawBody = await request.text();
   const signature = request.headers.get("x-razorpay-signature");
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const secret = env.RAZORPAY_WEBHOOK_SECRET;
 
   if (!secret) {
     console.warn("[razorpay] RAZORPAY_WEBHOOK_SECRET not set — signature verification disabled");

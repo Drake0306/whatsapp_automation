@@ -1,12 +1,13 @@
 import Razorpay from "razorpay";
 import crypto from "node:crypto";
+import { env } from "$env/dynamic/private";
 
 let _instance: InstanceType<typeof Razorpay> | null = null;
 
 export function getRazorpay() {
   if (!_instance) {
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const keyId = env.RAZORPAY_KEY_ID;
+    const keySecret = env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) {
       throw new Error("RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set");
     }

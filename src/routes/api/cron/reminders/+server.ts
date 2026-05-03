@@ -4,14 +4,13 @@ import { db } from "$lib/server/db/index.js";
 import { appointments, businesses, conversations, feedback } from "$lib/server/db/schema.js";
 import { eq, and, isNull, isNotNull, lte, gte, sql } from "drizzle-orm";
 import { sendWhatsAppMessage } from "$lib/server/whatsapp.js";
-
-const CRON_SECRET = process.env.CRON_SECRET;
+import { env } from "$env/dynamic/private";
 
 export const POST: RequestHandler = async ({ request }) => {
   const auth = request.headers.get("authorization");
-  if (!CRON_SECRET) {
+  if (!env.CRON_SECRET) {
     console.warn("[cron] CRON_SECRET not set — endpoint is unprotected");
-  } else if (auth !== `Bearer ${CRON_SECRET}`) {
+  } else if (auth !== `Bearer ${env.CRON_SECRET}`) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
 

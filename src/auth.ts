@@ -9,6 +9,7 @@ import {
   sessions,
   verificationTokens,
 } from "$lib/server/db/schema.js";
+import { env } from "$env/dynamic/private";
 import type { Handle } from "@sveltejs/kit";
 
 let _handle: Handle | null = null;
@@ -26,14 +27,14 @@ function initAuth(): Handle {
         Google,
         Nodemailer({
           server: {
-            host: process.env.EMAIL_SERVER_HOST,
-            port: Number(process.env.EMAIL_SERVER_PORT || 587),
+            host: env.EMAIL_SERVER_HOST,
+            port: Number(env.EMAIL_SERVER_PORT || 587),
             auth: {
-              user: process.env.EMAIL_SERVER_USER,
-              pass: process.env.EMAIL_SERVER_PASSWORD,
+              user: env.EMAIL_SERVER_USER,
+              pass: env.EMAIL_SERVER_PASSWORD,
             },
           },
-          from: process.env.EMAIL_FROM || "noreply@whatsappflow.app",
+          from: env.EMAIL_FROM || "noreply@whatsappflow.app",
         }),
       ],
       pages: {

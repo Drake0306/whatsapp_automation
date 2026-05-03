@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { env } from "$env/dynamic/private";
 
 export type WhatsAppMode = "bsp" | "direct";
 
@@ -9,13 +10,13 @@ interface WhatsAppConfig {
 }
 
 function getConfig(): WhatsAppConfig {
-  const mode = (process.env.WHATSAPP_MODE || "bsp") as WhatsAppMode;
-  const apiToken = process.env.WHATSAPP_API_TOKEN || "";
+  const mode = (env.WHATSAPP_MODE || "bsp") as WhatsAppMode;
+  const apiToken = env.WHATSAPP_API_TOKEN || "";
 
   const apiUrl =
     mode === "direct"
-      ? process.env.WHATSAPP_API_URL || "https://graph.facebook.com/v21.0"
-      : process.env.WHATSAPP_BSP_API_URL || process.env.WHATSAPP_API_URL || "https://graph.facebook.com/v20.0";
+      ? env.WHATSAPP_API_URL || "https://graph.facebook.com/v21.0"
+      : env.WHATSAPP_BSP_API_URL || env.WHATSAPP_API_URL || "https://graph.facebook.com/v20.0";
 
   return { mode, apiToken, apiUrl };
 }

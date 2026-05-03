@@ -1,4 +1,5 @@
 import { models, type ModelConfig } from "$lib/config/models.js";
+import { env } from "$env/dynamic/private";
 
 export interface LlmMessage {
   role: "system" | "user" | "assistant";
@@ -15,7 +16,7 @@ async function callGemini(
   model: ModelConfig,
   messages: LlmMessage[],
 ): Promise<LlmResponse> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
   const systemInstruction = messages.find((m) => m.role === "system");
@@ -63,7 +64,7 @@ async function callGroq(
   model: ModelConfig,
   messages: LlmMessage[],
 ): Promise<LlmResponse> {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = env.GROQ_API_KEY;
   if (!apiKey) throw new Error("GROQ_API_KEY not set");
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -99,7 +100,7 @@ async function callAnthropic(
   model: ModelConfig,
   messages: LlmMessage[],
 ): Promise<LlmResponse> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
   const system = messages.find((m) => m.role === "system")?.content;
@@ -146,7 +147,7 @@ async function callSarvam(
   model: ModelConfig,
   messages: LlmMessage[],
 ): Promise<LlmResponse> {
-  const apiKey = process.env.SARVAM_API_KEY;
+  const apiKey = env.SARVAM_API_KEY;
   if (!apiKey) throw new Error("SARVAM_API_KEY not set");
 
   const res = await fetch("https://api.sarvam.ai/v1/chat/completions", {
