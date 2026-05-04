@@ -373,6 +373,16 @@ export const businessHours = mysqlTable(
 );
 
 // ────────────────────────────────────────────
+// Platform Config (super admin settings)
+// ────────────────────────────────────────────
+
+export const platformConfig = mysqlTable("platform_config", {
+  key: varchar("config_key", { length: 100 }).primaryKey(),
+  value: json("config_value").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// ────────────────────────────────────────────
 // Billing
 // ────────────────────────────────────────────
 

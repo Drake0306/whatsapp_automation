@@ -10,6 +10,7 @@
   const NAV_ITEMS = [
     { href: "/admin", label: "Overview" },
     { href: "/admin/invite", label: "Invite Tenant" },
+    { href: "/admin/models", label: "Models" },
   ];
 </script>
 

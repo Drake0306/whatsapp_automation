@@ -99,11 +99,12 @@ WhatsAppFlow — SvelteKit 2 SaaS platform. AI WhatsApp automation for Indian sm
 - DrizzleAdapter receives `getDb()` (real instance), not the Proxy `db`
 
 ## Schema
-- 18 tables defined in `src/lib/server/db/schema.ts`
+- 19 tables defined in `src/lib/server/db/schema.ts`
 - Auth tables: users, accounts, sessions, verification_tokens
 - Business tables: businesses, conversations, messages, appointments, escalations
 - CRM: contacts, contact_tags
 - Campaigns: broadcasts, broadcast_recipients
+- Platform: platform_config (key-value store for super admin settings like model routing)
 - Other: feedback, quick_replies, business_hours, business_docs, business_tone_config, business_skills, subscriptions
 
 ## WhatsApp Integration
@@ -225,8 +226,10 @@ WHATSAPP_BSP_API_URL=""                          # leave blank unless using a BS
 - Services management: `src/routes/dashboard/services/+page.svelte`
 - LLM clients: `src/lib/server/llm.ts`
 - Model config: `src/lib/config/models.ts`
+- Platform config (runtime model overrides): `src/lib/server/platform-config.ts`
 - Super admin guard: `src/lib/server/admin.ts`
 - Super admin dashboard: `src/routes/admin/+page.svelte`
+- Admin model routing: `src/routes/admin/models/+page.svelte`
 - Admin invite flow: `src/routes/admin/invite/+page.svelte`
 - Admin login: `src/routes/admin/login/+page.svelte`
 - Email utility: `src/lib/server/email.ts`

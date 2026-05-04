@@ -57,13 +57,32 @@ export type SkillRoute =
   | "vernacular"
   | "escalation-draft";
 
-export const skillRouting: Record<SkillRoute, string> = {
+export const defaultSkillRouting: Record<SkillRoute, string> = {
   "intent-classifier": "gemini-flash",
   faq: "gemini-flash",
   booking: "gemini-flash",
   vernacular: "sarvam-m",
   "escalation-draft": "claude-sonnet",
 };
+
+let runtimeOverrides: Partial<Record<SkillRoute, string>> = {};
+
+export function setSkillRoutingOverrides(overrides: Partial<Record<SkillRoute, string>>) {
+  runtimeOverrides = overrides;
+}
+
+export function getSkillRoutingOverrides(): Partial<Record<SkillRoute, string>> {
+  return { ...runtimeOverrides };
+}
+
+export const skillRouting: Record<SkillRoute, string> = new Proxy(
+  defaultSkillRouting,
+  {
+    get(target, prop: string) {
+      return runtimeOverrides[prop as SkillRoute] ?? target[prop as SkillRoute];
+    },
+  },
+);
 
 export function getModelForSkill(route: SkillRoute): ModelConfig {
   const modelId = skillRouting[route];
