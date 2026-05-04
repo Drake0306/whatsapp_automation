@@ -26,12 +26,14 @@ export const GET: RequestHandler = async ({ url }) => {
 
 export const POST: RequestHandler = async ({ request }) => {
   const rawBody = await request.text();
+  console.log("[webhook] POST received");
 
   const signature = request.headers.get("x-hub-signature-256");
   const appSecret = env.WHATSAPP_APP_SECRET;
   if (!appSecret) {
     console.warn("[webhook] WHATSAPP_APP_SECRET not set — signature verification disabled");
   } else if (!verifyWebhookSignature(rawBody, signature, appSecret)) {
+    console.error("[webhook] Invalid signature — rejecting");
     return json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -44,8 +46,11 @@ export const POST: RequestHandler = async ({ request }) => {
   const incoming = parseIncomingMessage(body);
 
   if (!incoming) {
+    console.log("[webhook] No message in payload (status update or other event)");
     return json({ status: "no_message" }, { status: 200 });
   }
+
+  console.log(`[webhook] Message from ${incoming.from}: "${incoming.text?.body ?? "(non-text)"}" | phoneNumberId: ${incoming.phoneNumberId}`);
 
   const [business] = await db
     .select()
@@ -59,6 +64,8 @@ export const POST: RequestHandler = async ({ request }) => {
     );
     return json({ status: "unknown_business" }, { status: 200 });
   }
+
+  console.log(`[webhook] Matched business: ${business.name} (${business.id})`);
 
   let [conversation] = await db
     .select()
@@ -143,22 +150,22 @@ export const POST: RequestHandler = async ({ request }) => {
 
   let result;
   try {
+    console.log(`[webhook] Routing message to skill router...`);
     result = await routeMessage({ text: messageText, raw: body }, ctx);
+    console.log(`[webhook] Skill result: skill=${result.skillId}, confidence=${result.confidence}, hasReply=${!!result.reply}`);
   } catch (err) {
     console.error("[webhook] routeMessage failed:", err);
     return json({ status: "ok" }, { status: 200 });
   }
 
   if (result.reply) {
-    try {
-      await sendWhatsAppMessage(
-        incoming.phoneNumberId,
-        incoming.from,
-        result.reply,
-      );
-    } catch (err) {
-      console.error("[webhook] sendWhatsAppMessage failed:", err);
-    }
+    console.log(`[webhook] Sending reply (${result.reply.length} chars) to ${incoming.from}`);
+    const sent = await sendWhatsAppMessage(
+      incoming.phoneNumberId,
+      incoming.from,
+      result.reply,
+    );
+    console.log(`[webhook] sendWhatsAppMessage result: ${sent ? "SUCCESS" : "FAILED"}`);
 
     await db.insert(messages).values({
       conversationId: conversation.id,
