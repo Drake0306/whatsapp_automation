@@ -141,14 +141,24 @@ export const POST: RequestHandler = async ({ request }) => {
     tone: tone ?? null,
   };
 
-  const result = await routeMessage({ text: messageText, raw: body }, ctx);
+  let result;
+  try {
+    result = await routeMessage({ text: messageText, raw: body }, ctx);
+  } catch (err) {
+    console.error("[webhook] routeMessage failed:", err);
+    return json({ status: "ok" }, { status: 200 });
+  }
 
   if (result.reply) {
-    await sendWhatsAppMessage(
-      incoming.phoneNumberId,
-      incoming.from,
-      result.reply,
-    );
+    try {
+      await sendWhatsAppMessage(
+        incoming.phoneNumberId,
+        incoming.from,
+        result.reply,
+      );
+    } catch (err) {
+      console.error("[webhook] sendWhatsAppMessage failed:", err);
+    }
 
     await db.insert(messages).values({
       conversationId: conversation.id,

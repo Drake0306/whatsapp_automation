@@ -2,6 +2,9 @@ import type { Skill, SkillContext, IncomingMessage, SkillResult } from "./types.
 import { callLlm } from "$lib/server/llm.js";
 import { skillRouting } from "$lib/config/models.js";
 import { buildSystemPrompt } from "$lib/server/prompt-templates.js";
+import { db } from "$lib/server/db/index.js";
+import { businessDocs } from "$lib/server/db/schema.js";
+import { eq } from "drizzle-orm";
 
 export const fallbackSkill: Skill = {
   id: "fallback",
@@ -13,7 +16,16 @@ export const fallbackSkill: Skill = {
   },
 
   async handle(msg: IncomingMessage, ctx: SkillContext): Promise<SkillResult> {
-    const skillContext = "If the customer greeted you, greet them warmly and ask how you can help. If you're unsure what they want, ask a clarifying question.";
+    const docs = await db
+      .select({ chunkText: businessDocs.chunkText })
+      .from(businessDocs)
+      .where(eq(businessDocs.businessId, ctx.businessId));
+
+    const knowledgeBase = docs.length > 0
+      ? `\n\nKnowledge base:\n${docs.slice(0, 3).map((d) => d.chunkText).join("\n---\n")}`
+      : "";
+
+    const skillContext = `Greet the customer warmly and briefly mention the key services or specialties of the business. Make them feel welcome and let them know you can help with bookings, pricing, or any questions.${knowledgeBase}`;
     const systemPrompt = buildSystemPrompt(
       ctx.businessName,
       ctx.vertical,
@@ -29,8 +41,7 @@ export const fallbackSkill: Skill = {
 
     return {
       reply: response.text,
-      confidence: 0.5,
-      needsReview: true,
+      confidence: 0.6,
       skillId: "fallback",
     };
   },
