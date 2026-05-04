@@ -77,12 +77,72 @@ WhatsAppFlow — SvelteKit 2 SaaS platform. AI WhatsApp automation for Indian sm
 - Campaigns: broadcasts, broadcast_recipients
 - Other: feedback, quick_replies, business_hours, business_docs, business_tone_config, business_skills, subscriptions
 
+## WhatsApp Integration
+
+### Architecture (BSP Model)
+- Single platform-owned WhatsApp API token in `WHATSAPP_API_TOKEN` env var — serves all tenants
+- Each tenant provides only their **Meta Phone Number ID** (not a phone number, not a token)
+- Phone Number ID is a 15-16 digit numeric ID from Meta Dashboard → WhatsApp → API Setup
+- Webhook at `/api/whatsapp/webhook` routes incoming messages by matching `phone_number_id` to `businesses.whatsappPhoneNumberId`
+
+### Message Flow
+1. Customer sends WhatsApp message → Meta forwards to webhook (POST)
+2. Webhook parses payload, matches business by `phoneNumberId`
+3. Intent classifier (Gemini Flash) categorizes: question, booking, reschedule, cancel, greeting, talk_to_owner, other
+4. Matched skill generates reply using knowledge base docs from `business_docs` table
+5. Reply sent back via `POST https://graph.facebook.com/v22.0/{phoneNumberId}/messages`
+
+### WhatsApp Env Vars
+```
+WHATSAPP_MODE="bsp"                              # "bsp" or "direct"
+WHATSAPP_VERIFY_TOKEN="<any-secret-you-invent>"  # must match Meta webhook config
+WHATSAPP_APP_SECRET="<from Meta App Settings>"   # for signature verification (optional but recommended)
+WHATSAPP_API_TOKEN="<system-user-token>"         # permanent token from Meta System User
+WHATSAPP_API_URL="https://graph.facebook.com/v22.0"
+WHATSAPP_BSP_API_URL=""                          # leave blank unless using a BSP
+```
+
+### Meta Dashboard Setup
+1. Register webhook URL: `https://<domain>/api/whatsapp/webhook`
+2. Set verify token to match `WHATSAPP_VERIFY_TOKEN`
+3. Subscribe to **"messages"** webhook field
+4. Add test recipient numbers with country code (e.g. `+917903826151`) and verify via OTP
+
+### Phone Number Normalization
+- `src/lib/server/phone.ts` — `normalizePhone()` auto-prepends `91` for 10-digit Indian numbers
+- Applied on contacts form input; incoming webhook messages already have country code from Meta
+
+### Testing WhatsApp (with Meta Test Number)
+- Meta provides a free test number; find its **Phone Number ID** in API Setup
+- App does NOT need to be in "Live" mode for testing — Development mode works
+- Recipient numbers must be added to the allowed list with OTP verification
+- Use **System User token** (permanent) — temporary tokens from API Setup expire in 24 hours
+- To get a permanent token: Meta Business Suite → Settings → System Users → assign app → generate token with `whatsapp_business_management` + `whatsapp_business_messaging` permissions
+
+### Troubleshooting WhatsApp
+- **No webhook received**: Check "messages" field is subscribed in Meta webhook config
+- **"unknown_business" in logs**: Phone Number ID in database doesn't match what Meta sends — update via Settings page
+- **"Recipient phone number not in allowed list"**: Add number with `+91` prefix in Meta API Setup and complete OTP
+- **"Object with ID does not exist"**: Wrong Phone Number ID stored (entered phone number instead of Meta's numeric ID)
+- **Gemini 404 error**: Model ID expired — check `src/lib/config/models.ts` uses a valid model (list via Gemini API)
+- **Token expired**: Replace with System User token; temporary tokens die after 24 hours
+- **Railway logs**: All webhook steps logged with `[webhook]` prefix — check Railway dashboard → Logs
+
+### Knowledge Base
+- Upload via `/dashboard/knowledge` — supports file upload (PDF, TXT, CSV) or direct text entry
+- Text is chunked (800 words, 100 overlap) and stored in `business_docs` table
+- FAQ skill retrieves relevant chunks via keyword matching when answering questions
+- No R2 required — works with DB-only storage when R2 credentials are not configured
+- Sample template available via "Download Template" button on the page
+
 ## Deployment
 - **Railway** with Railpack builder — auto-detects Node, runs `npm run build`, starts with `node build`
+- **Production URL**: `https://whatsappautomation-production-1928.up.railway.app`
 - **GitHub Actions CI** (`.github/workflows/ci.yml`) — type check → test → build on every push/PR to main
 - Build uses fake `DATABASE_URL` since DB init is lazy
 - SMTP in production: Resend (`smtp.resend.com`, port 465)
 - SMTP in local dev: Mailpit via Docker Compose (port 1025, no auth)
+- **Important**: env vars must be set in Railway Variables tab (not just local `.env`)
 
 ## Testing
 - Vitest with SvelteKit vite config (`vitest.config.ts`)
@@ -95,9 +155,15 @@ WhatsAppFlow — SvelteKit 2 SaaS platform. AI WhatsApp automation for Indian sm
 - DB connection: `src/lib/server/db/index.ts`
 - Auth config: `src/auth.ts`
 - WhatsApp webhook: `src/routes/api/whatsapp/webhook/+server.ts`
+- WhatsApp client: `src/lib/server/whatsapp.ts`
+- Phone normalization: `src/lib/server/phone.ts`
+- Knowledge base upload: `src/routes/api/upload/+server.ts`
+- Knowledge base page: `src/routes/dashboard/knowledge/+page.svelte`
 - Cron reminders: `src/routes/api/cron/reminders/+server.ts`
 - Skill router: `src/lib/skills/router.ts`
+- Intent classifier: `src/lib/skills/classifier.ts`
 - LLM clients: `src/lib/server/llm.ts`
+- Model config: `src/lib/config/models.ts`
 - Seed script: `scripts/seed.ts`
 - CI workflow: `.github/workflows/ci.yml`
 - Env example: `.env.example`
