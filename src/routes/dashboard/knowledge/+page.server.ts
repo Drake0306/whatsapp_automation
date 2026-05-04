@@ -4,6 +4,7 @@ import { db } from "$lib/server/db/index.js";
 import { businesses, businessDocs } from "$lib/server/db/schema.js";
 import { eq, and, sql } from "drizzle-orm";
 import { deleteFile } from "$lib/server/storage.js";
+import { chunkText } from "$lib/server/file-extract.js";
 
 export const load: PageServerLoad = async (event) => {
   const session = await event.locals.auth();
@@ -33,6 +34,39 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions: Actions = {
+  "save-text": async ({ request, locals }) => {
+    const session = await locals.auth();
+    if (!session?.user?.id) return fail(401);
+
+    const form = await request.formData();
+    const content = (form.get("content") as string)?.trim();
+    const title = (form.get("title") as string)?.trim() || "Manual entry";
+
+    if (!content) return fail(400, { error: "Content is required" });
+
+    const [business] = await db
+      .select()
+      .from(businesses)
+      .where(eq(businesses.ownerUserId, session.user.id))
+      .limit(1);
+
+    if (!business) return fail(400);
+
+    const chunks = chunkText(content);
+    for (let i = 0; i < chunks.length; i++) {
+      await db.insert(businessDocs).values({
+        businessId: business.id,
+        source: title,
+        chunkText: chunks[i],
+        chunkIndex: i,
+        metadata: { type: "manual", charCount: content.length },
+        storageKey: null,
+      });
+    }
+
+    return { success: true };
+  },
+
   delete: async ({ request, locals }) => {
     const session = await locals.auth();
     if (!session?.user?.id) return fail(401);
