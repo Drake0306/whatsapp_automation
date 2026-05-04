@@ -35,9 +35,16 @@ WhatsAppFlow — SvelteKit 2 SaaS platform. AI WhatsApp automation for Indian sm
 - `scripts/` directory uses `dotenv` directly since scripts run outside SvelteKit.
 
 ### Skill Routing (Strategy Pattern)
-- `src/lib/config/models.ts` — maps skills to LLM models via `skillRouting` config
+- `src/lib/config/models.ts` — maps skills to LLM models via `skillRouting` Proxy (supports runtime overrides)
 - `src/lib/skills/router.ts` — intent classifier (Gemini Flash) determines skill, routes to handler
 - Each skill is a standalone handler in `src/lib/skills/`
+- Runtime model overrides: super admin can switch models via `/admin/models`, stored in `platform_config` table, loaded on every request via hooks
+
+### Booking Skill — LLM Integration Pattern
+- LLM outputs structured tags: `BOOKING_REQUEST: {json}` or `SLOTS_REQUEST: {json}` — code parses with regex
+- The LLM must NEVER confirm bookings or judge availability — only the system (slot engine) can
+- Safety net: if LLM output contains "confirmed/booked/scheduled" without a `BOOKING_REQUEST` tag, it's replaced with a retry prompt and flagged for escalation (confidence dropped to 0.5)
+- Greeting/fallback skill shows reply buttons on first message; fetches active services to list capabilities
 
 ### DB Query Optimization
 - N+1 patterns eliminated with `inArray()` batch queries + `Promise.all()` parallelization
@@ -123,9 +130,18 @@ WhatsAppFlow — SvelteKit 2 SaaS platform. AI WhatsApp automation for Indian sm
 ### Message Flow
 1. Customer sends WhatsApp message → Meta forwards to webhook (POST)
 2. Webhook parses payload, matches business by `phoneNumberId`
-3. Intent classifier (Gemini Flash) categorizes: question, booking, reschedule, cancel, greeting, talk_to_owner, other
-4. Matched skill generates reply using knowledge base docs from `business_docs` table
-5. Reply sent back via `POST https://graph.facebook.com/v22.0/{phoneNumberId}/messages`
+3. If interactive reply (list_reply/button_reply), router handles directly — no LLM intent classification
+4. Otherwise, intent classifier (Gemini Flash) categorizes: question, booking, reschedule, cancel, greeting, talk_to_owner, other
+5. Matched skill generates reply using knowledge base docs from `business_docs` table
+6. Reply sent as interactive message (list/buttons) when available, plain text fallback if API rejects
+
+### Interactive Messages
+- `sendWhatsAppInteractiveList()` — selectable list with sections (max 10 rows, 10 sections). Used for slot selection.
+- `sendWhatsAppReplyButtons()` — up to 3 tap-able buttons. Used for greeting quick actions.
+- WhatsApp API limits: row title 24 chars, description 72, section title 24, header 60, body 1024, button text 20
+- `parseIncomingMessage()` handles `type: "interactive"` — extracts `list_reply`/`button_reply`, maps title to `text.body` for compatibility
+- Interactive reply IDs: `book_{serviceId}_{isoDate}` (slot selection), `action_book`/`action_menu`/`action_question` (greeting buttons)
+- Router (`router.ts`) checks `msg.interactiveId` first and routes directly to the right skill, bypassing LLM classifier
 
 ### WhatsApp Env Vars
 ```
@@ -174,8 +190,10 @@ WHATSAPP_BSP_API_URL=""                          # leave blank unless using a BS
 
 ### Architecture
 - `src/lib/server/slot-engine.ts` — core availability and booking engine
-- Timezone-aware using `Intl.DateTimeFormat` for all local time conversions
+- Timezone-aware: `localTimeToUtc()` converts local business time to UTC (exported, used by booking skill)
+- NEVER use `new Date("YYYY-MM-DDTHH:MM:00")` for booking times — it creates UTC, not local time. Always use `localTimeToUtc()`.
 - 15-minute slot intervals, capacity-aware (supports both single-chair salons and multi-table restaurants)
+- Falls back to 9 AM – 8 PM defaults when `business_hours` rows don't exist for a day (not treated as closed)
 
 ### Two Booking Modes
 - **Instant** (salons, gyms): auto-confirmed on booking, customer gets immediate confirmation
@@ -228,6 +246,8 @@ WHATSAPP_BSP_API_URL=""                          # leave blank unless using a BS
 - Booking skill: `src/lib/skills/booking.ts`
 - Cancel skill: `src/lib/skills/cancel.ts`
 - Reschedule skill: `src/lib/skills/reschedule.ts`
+- Fallback/greeting skill: `src/lib/skills/fallback.ts`
+- Skill types (SkillResult, InteractivePayload): `src/lib/skills/types.ts`
 - Services management: `src/routes/dashboard/services/+page.svelte`
 - LLM clients: `src/lib/server/llm.ts`
 - Model config: `src/lib/config/models.ts`
