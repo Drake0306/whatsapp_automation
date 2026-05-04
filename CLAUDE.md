@@ -10,7 +10,7 @@ WhatsAppFlow — SvelteKit 2 SaaS platform. AI WhatsApp automation for Indian sm
 
 - `npm run dev` — local dev server (port 5173)
 - `npm run check` — svelte-kit sync + svelte-check (must pass before commit)
-- `npm test` — vitest (42 tests, must pass before commit)
+- `npm test` — vitest (44 tests, must pass before commit)
 - `npm run build` — production build (needs `DATABASE_URL` env var, can be fake for CI)
 - `npm run db:generate` — generate Drizzle migrations from schema
 - `npm run db:migrate` — apply migrations to DATABASE_URL
@@ -143,6 +143,33 @@ WHATSAPP_BSP_API_URL=""                          # leave blank unless using a BS
 - No R2 required — works with DB-only storage when R2 credentials are not configured
 - Sample template available via "Download Template" button on the page
 
+## Slot Engine & Booking
+
+### Architecture
+- `src/lib/server/slot-engine.ts` — core availability and booking engine
+- Timezone-aware using `Intl.DateTimeFormat` for all local time conversions
+- 15-minute slot intervals, capacity-aware (supports both single-chair salons and multi-table restaurants)
+
+### Two Booking Modes
+- **Instant** (salons, gyms): auto-confirmed on booking, customer gets immediate confirmation
+- **Queue** (restaurants): booking set to "pending", business owner confirms/rejects via dashboard
+
+### Key Functions
+- `getActiveServices(businessId)` — returns all active services for a business
+- `getAvailableSlots({businessId, serviceId, date, timezone})` — returns open time slots for a given day
+- `checkSlotAvailable({businessId, serviceId, slotAt, timezone})` — checks if a specific slot is bookable
+- `bookSlot({businessId, serviceId, slotAt, customerPhone, conversationId, timezone})` — books a slot with optimistic insert + recheck for race conditions
+- `suggestAlternatives({businessId, serviceId, preferredDate, timezone})` — finds nearby available slots
+
+### Slot Blocks
+- Business owners can block time ranges via Services dashboard (`/dashboard/services`)
+- Blocks apply to all services or a specific service
+- Stored in `slot_blocks` table, respected by slot engine queries
+
+### Vertical Defaults
+- Each vertical in `src/lib/config/verticals.ts` defines `appointmentTypes` with `defaultDuration`, `defaultCapacity`, `defaultBookingMode`
+- Seeded during onboarding and admin invite into `business_services` table
+
 ## Deployment
 - **Railway** with Railpack builder — auto-detects Node, runs `npm run build`, starts with `node build`
 - **Production URL**: `https://whatsappautomation-production-1928.up.railway.app`
@@ -154,7 +181,7 @@ WHATSAPP_BSP_API_URL=""                          # leave blank unless using a BS
 
 ## Testing
 - Vitest with SvelteKit vite config (`vitest.config.ts`)
-- 42 tests in `tests/unit/`: verticals, models, whatsapp parsing, razorpay signatures, PDF extraction, prompt templates
+- 44 tests in `tests/unit/`: verticals, models, whatsapp parsing, razorpay signatures, PDF extraction, prompt templates
 - Tests do NOT hit the database — pure unit tests on config and utility modules
 - CI blocks merge if any test fails
 
@@ -168,8 +195,13 @@ WHATSAPP_BSP_API_URL=""                          # leave blank unless using a BS
 - Knowledge base upload: `src/routes/api/upload/+server.ts`
 - Knowledge base page: `src/routes/dashboard/knowledge/+page.svelte`
 - Cron reminders: `src/routes/api/cron/reminders/+server.ts`
+- Slot engine: `src/lib/server/slot-engine.ts`
 - Skill router: `src/lib/skills/router.ts`
 - Intent classifier: `src/lib/skills/classifier.ts`
+- Booking skill: `src/lib/skills/booking.ts`
+- Cancel skill: `src/lib/skills/cancel.ts`
+- Reschedule skill: `src/lib/skills/reschedule.ts`
+- Services management: `src/routes/dashboard/services/+page.svelte`
 - LLM clients: `src/lib/server/llm.ts`
 - Model config: `src/lib/config/models.ts`
 - Super admin guard: `src/lib/server/admin.ts`

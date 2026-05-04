@@ -151,6 +151,8 @@
               >
                 <option value="salon">Salon</option>
                 <option value="clinic">Clinic</option>
+                <option value="restaurant">Restaurant / Cafe</option>
+                <option value="gym">Gym / Fitness</option>
                 <option value="coaching">Coaching Centre</option>
                 <option value="retail">Retail / Kirana</option>
                 <option value="other">Other</option>

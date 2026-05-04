@@ -16,6 +16,7 @@
     "/dashboard/knowledge": "form",
     "/dashboard/quick-replies": "form",
     "/dashboard/settings": "form",
+    "/dashboard/services": "table",
     "/dashboard/billing": "cards",
   };
 

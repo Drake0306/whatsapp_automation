@@ -172,6 +172,8 @@ export const appointments = mysqlTable("appointments", {
   conversationId: varchar("conversation_id", { length: 36 }).references(
     () => conversations.id,
   ),
+  serviceId: varchar("service_id", { length: 36 })
+    .references(() => businessServices.id, { onDelete: "set null" }),
   customerPhone: varchar("customer_phone", { length: 20 }).notNull(),
   service: varchar("service", { length: 255 }),
   slotAt: timestamp("slot_at", { mode: "date" }).notNull(),
@@ -182,7 +184,7 @@ export const appointments = mysqlTable("appointments", {
   rebookNudgeSentAt: timestamp("rebook_nudge_sent_at", { mode: "date" }),
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-}, (t) => [index("appointments_business_idx").on(t.businessId), index("appointments_business_status_idx").on(t.businessId, t.status), index("appointments_slot_idx").on(t.slotAt)]);
+}, (t) => [index("appointments_business_idx").on(t.businessId), index("appointments_business_status_idx").on(t.businessId, t.status), index("appointments_slot_idx").on(t.slotAt), index("appointments_business_phone_idx").on(t.businessId, t.customerPhone)]);
 
 export const escalations = mysqlTable("escalations", {
   id: varchar("id", { length: 36 })
@@ -312,6 +314,45 @@ export const quickReplies = mysqlTable("quick_replies", {
   body: text("body").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 }, (t) => [index("quick_replies_business_idx").on(t.businessId)]);
+
+// ────────────────────────────────────────────
+// Services & Slot Management
+// ────────────────────────────────────────────
+
+export const businessServices = mysqlTable("business_services", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  businessId: varchar("business_id", { length: 36 })
+    .notNull()
+    .references(() => businesses.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  durationMin: int("duration_min").notNull().default(60),
+  capacity: int("capacity").notNull().default(1),
+  bookingMode: varchar("booking_mode", { length: 20 }).notNull().default("instant"),
+  price: int("price"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: int("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.businessId, t.name),
+  index("business_services_business_idx").on(t.businessId),
+]);
+
+export const slotBlocks = mysqlTable("slot_blocks", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  businessId: varchar("business_id", { length: 36 })
+    .notNull()
+    .references(() => businesses.id, { onDelete: "cascade" }),
+  serviceId: varchar("service_id", { length: 36 })
+    .references(() => businessServices.id, { onDelete: "cascade" }),
+  startAt: timestamp("start_at", { mode: "date" }).notNull(),
+  endAt: timestamp("end_at", { mode: "date" }).notNull(),
+  reason: varchar("reason", { length: 255 }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (t) => [index("slot_blocks_business_start_idx").on(t.businessId, t.startAt)]);
 
 // ────────────────────────────────────────────
 // Business Hours

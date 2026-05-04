@@ -17,6 +17,7 @@ export interface SkillContext {
   businessName: string;
   vertical: string;
   language: string;
+  timezone: string;
   customerPhone: string;
   conversationId: string;
   conversationState: Record<string, unknown>;

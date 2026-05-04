@@ -47,6 +47,9 @@
       <a href="/dashboard/appointments" class="py-3 text-sm text-muted-foreground hover:text-foreground">
         Appointments
       </a>
+      <a href="/dashboard/services" class="py-3 text-sm text-muted-foreground hover:text-foreground">
+        Services
+      </a>
       <a href="/dashboard/broadcasts" class="py-3 text-sm text-muted-foreground hover:text-foreground">
         Broadcasts
       </a>

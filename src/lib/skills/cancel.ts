@@ -1,7 +1,7 @@
 import type { Skill, SkillContext, IncomingMessage, SkillResult } from "./types.js";
 import { db } from "$lib/server/db/index.js";
 import { appointments } from "$lib/server/db/schema.js";
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and, gte, inArray } from "drizzle-orm";
 
 export const cancelSkill: Skill = {
   id: "cancel",
@@ -19,11 +19,11 @@ export const cancelSkill: Skill = {
         and(
           eq(appointments.businessId, ctx.businessId),
           eq(appointments.customerPhone, ctx.customerPhone),
-          eq(appointments.status, "confirmed"),
+          inArray(appointments.status, ["confirmed", "pending"]),
           gte(appointments.slotAt, new Date()),
         ),
       )
-      .limit(1);
+      .orderBy(appointments.slotAt);
 
     if (upcoming.length === 0) {
       return {
@@ -39,19 +39,38 @@ export const cancelSkill: Skill = {
       .set({ status: "cancelled" })
       .where(eq(appointments.id, appt.id));
 
-    const d = new Date(appt.slotAt);
-    const dateStr = d.toLocaleDateString("en-IN", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-    const timeStr = d.toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const formatAppt = (a: typeof appt) => {
+      const d = new Date(a.slotAt);
+      const dateStr = d.toLocaleDateString("en-IN", {
+        timeZone: ctx.timezone,
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      });
+      const timeStr = d.toLocaleTimeString("en-IN", {
+        timeZone: ctx.timezone,
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return { dateStr, timeStr };
+    };
+
+    const { dateStr, timeStr } = formatAppt(appt);
+    let reply = `Your ${appt.service ?? "appointment"} on *${dateStr}* at *${timeStr}* has been cancelled.`;
+
+    if (upcoming.length > 1) {
+      const remaining = upcoming.slice(1);
+      const list = remaining.map((a) => {
+        const f = formatAppt(a);
+        return `- ${a.service ?? "Appointment"} on ${f.dateStr} at ${f.timeStr}`;
+      }).join("\n");
+      reply += `\n\nYou still have ${remaining.length} more upcoming appointment${remaining.length > 1 ? "s" : ""}:\n${list}\n\nWould you like to cancel any of these, or book a different time?`;
+    } else {
+      reply += " Would you like to book a different time?";
+    }
 
     return {
-      reply: `Your ${appt.service ?? "appointment"} on *${dateStr}* at *${timeStr}* has been cancelled. Would you like to book a different time?`,
+      reply,
       confidence: 0.95,
       sideEffects: [{ type: "booking_cancel", payload: { appointmentId: appt.id } }],
       skillId: "cancel",

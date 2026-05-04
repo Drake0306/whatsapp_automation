@@ -4,9 +4,11 @@ import { db } from "$lib/server/db/index.js";
 import {
   businesses,
   businessSkills,
+  businessServices,
   businessToneConfig,
 } from "$lib/server/db/schema.js";
 import { eq } from "drizzle-orm";
+import { getVertical } from "$lib/config/verticals.js";
 
 export const load: PageServerLoad = async (event) => {
   const session = await event.locals.auth();
@@ -33,8 +35,6 @@ function slugify(name: string): string {
     .slice(0, 100)
     + "-" + Date.now().toString(36);
 }
-
-const DEFAULT_SALON_SKILLS = ["faq", "booking", "reschedule", "cancel", "reminder", "rebook_nudge", "cold_lead_nudge", "fallback", "escalate"];
 
 export const actions: Actions = {
   "save-business-info": async ({ request, locals }) => {
@@ -76,8 +76,22 @@ export const actions: Actions = {
       timezone: timezone || "Asia/Kolkata",
     });
 
-    for (const skillId of DEFAULT_SALON_SKILLS) {
+    const verticalConfig = getVertical(vertical);
+
+    for (const skillId of verticalConfig.defaultSkills) {
       await db.insert(businessSkills).values({ businessId: id, skillId });
+    }
+
+    for (let i = 0; i < verticalConfig.appointmentTypes.length; i++) {
+      const apt = verticalConfig.appointmentTypes[i];
+      await db.insert(businessServices).values({
+        businessId: id,
+        name: apt.label,
+        durationMin: apt.defaultDuration,
+        capacity: apt.defaultCapacity ?? 1,
+        bookingMode: apt.defaultBookingMode ?? "instant",
+        sortOrder: i,
+      });
     }
 
     return { success: true, businessId: id };
@@ -89,7 +103,6 @@ export const actions: Actions = {
 
     const form = await request.formData();
     const phoneNumberId = form.get("phoneNumberId") as string;
-    const apiToken = form.get("apiToken") as string;
 
     if (!phoneNumberId) {
       return fail(400, { error: "WhatsApp Phone Number ID is required" });

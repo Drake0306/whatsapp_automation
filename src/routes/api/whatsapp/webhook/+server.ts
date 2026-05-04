@@ -169,6 +169,7 @@ export const POST: RequestHandler = async ({ request }) => {
     businessName: business.name,
     vertical: business.vertical,
     language: business.language,
+    timezone: business.timezone,
     customerPhone: incoming.from,
     conversationId: conversation.id,
     conversationState: (conversation.state as Record<string, unknown>) ?? {},

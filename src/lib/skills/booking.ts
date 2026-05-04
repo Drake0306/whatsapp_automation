@@ -3,8 +3,32 @@ import { callLlm } from "$lib/server/llm.js";
 import { skillRouting } from "$lib/config/models.js";
 import { buildSystemPrompt } from "$lib/server/prompt-templates.js";
 import { db } from "$lib/server/db/index.js";
-import { appointments, businessHours } from "$lib/server/db/schema.js";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { businessHours } from "$lib/server/db/schema.js";
+import { eq } from "drizzle-orm";
+import {
+  getActiveServices,
+  getAvailableSlots,
+  bookSlot,
+  suggestAlternatives,
+  type TimeSlot,
+} from "$lib/server/slot-engine.js";
+
+function formatSlot(slot: TimeSlot, timezone: string): string {
+  const opts: Intl.DateTimeFormatOptions = {
+    timeZone: timezone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  };
+  return new Intl.DateTimeFormat("en-IN", opts).format(slot.startAt);
+}
+
+function formatSlotsList(slots: TimeSlot[], timezone: string): string {
+  return slots.map((s, i) => `${i + 1}. ${formatSlot(s, timezone)}`).join("\n");
+}
 
 export const bookingSkill: Skill = {
   id: "booking",
@@ -15,25 +39,7 @@ export const bookingSkill: Skill = {
   },
 
   async handle(msg: IncomingMessage, ctx: SkillContext): Promise<SkillResult> {
-    const now = new Date();
-    const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    const existingBookings = await db
-      .select({ slotAt: appointments.slotAt, durationMin: appointments.durationMin })
-      .from(appointments)
-      .where(
-        and(
-          eq(appointments.businessId, ctx.businessId),
-          gte(appointments.slotAt, now),
-          lte(appointments.slotAt, weekEnd),
-          eq(appointments.status, "confirmed"),
-        ),
-      );
-
-    const bookedSlots = existingBookings.map((b) => {
-      const start = new Date(b.slotAt);
-      return `${start.toLocaleDateString("en-IN")} ${start.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} (${b.durationMin}min)`;
-    });
+    const services = await getActiveServices(ctx.businessId);
 
     const hoursRows = await db
       .select()
@@ -50,20 +56,29 @@ export const bookingSkill: Skill = {
       }).join("\n");
     }
 
-    const skillContext = `The customer wants to book an appointment. Extract:
-1. What service they want
-2. When they want it (date + time)
+    const now = new Date();
+    const servicesList = services.length > 0
+      ? services.map((s) => `- "${s.name}" (${s.durationMin}min, ID: ${s.id})`).join("\n")
+      : "- No specific services configured. Use service name: \"Appointment\"";
 
-Currently booked slots (unavailable):
-${bookedSlots.length > 0 ? bookedSlots.join("\n") : "No bookings yet"}
+    const skillContext = `The customer wants to book. Extract the service and time.
+
+Available services:
+${servicesList}
 
 ${hoursText}
-Today is: ${now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+Timezone: ${ctx.timezone}
+Today: ${now.toLocaleDateString("en-IN", { timeZone: ctx.timezone, weekday: "long", day: "numeric", month: "long", year: "numeric" })}
 
-If the customer hasn't specified a time, suggest 2-3 available slots.
-If they've confirmed a time, respond with:
-BOOKING_CONFIRM: {"service": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "duration": 60}
-followed by a friendly confirmation message.`;
+RULES:
+- If the customer hasn't specified a service, ask which one they want.
+- If the customer hasn't specified a time, say you'll check availability and respond with:
+  SLOTS_REQUEST: {"serviceId": "<id>"}
+- If both service and time are clear, respond with:
+  BOOKING_REQUEST: {"serviceId": "<id>", "serviceName": "<name>", "date": "YYYY-MM-DD", "time": "HH:MM"}
+  followed by a brief "Let me check that for you..." message.
+- Do NOT confirm the booking yourself. The system will handle availability and confirm.
+- Be conversational and helpful. Use the customer's language when possible.`;
 
     const systemPrompt = buildSystemPrompt(
       ctx.businessName,
@@ -76,57 +91,145 @@ followed by a friendly confirmation message.`;
     const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: systemPrompt },
     ];
-
     for (const h of ctx.history.slice(0, -1)) {
       chatMessages.push({
         role: h.role === "customer" ? "user" : "assistant",
         content: h.text,
       });
     }
-
     chatMessages.push({ role: "user", content: msg.text });
 
-    const modelId = skillRouting["booking"];
-    const response = await callLlm(modelId, chatMessages);
+    const response = await callLlm(skillRouting["booking"], chatMessages);
 
-    const confirmMatch = response.text.match(
-      /BOOKING_CONFIRM:\s*(\{[^}]+\})/,
-    );
-
-    const sideEffects = [];
-    let replyText = response.text;
-
-    if (confirmMatch) {
+    const slotsMatch = response.text.match(/SLOTS_REQUEST:\s*(\{[^}]+\})/);
+    if (slotsMatch) {
       try {
-        const booking = JSON.parse(confirmMatch[1]);
-        const slotAt = new Date(`${booking.date}T${booking.time}:00`);
-
-        await db.insert(appointments).values({
-          businessId: ctx.businessId,
-          conversationId: ctx.conversationId,
-          customerPhone: ctx.customerPhone,
-          service: booking.service,
-          slotAt,
-          durationMin: booking.duration || 60,
-          status: "confirmed",
-        });
-
-        sideEffects.push({
-          type: "booking_create",
-          payload: booking,
-        });
-
-        replyText = response.text.replace(/BOOKING_CONFIRM:\s*\{[^}]+\}\s*/, "");
-      } catch {
-        // JSON parse failed — let the text reply through as-is
+        const req = JSON.parse(slotsMatch[1]);
+        const service = services.find((s) => s.id === req.serviceId) ?? services[0];
+        if (service) {
+          const upcoming = await getUpcomingSlotsForDisplay(ctx.businessId, service.id, ctx.timezone, 6);
+          if (upcoming.length > 0) {
+            const reply = `Here are the available slots for *${service.name}*:\n\n${formatSlotsList(upcoming, ctx.timezone)}\n\nPlease let me know which time works for you, or suggest a different time.`;
+            return { reply, confidence: 0.9, skillId: "booking" };
+          }
+          return {
+            reply: `Sorry, there are no available slots for ${service.name} in the next few days. Would you like to try a different service or time?`,
+            confidence: 0.9,
+            skillId: "booking",
+          };
+        }
+      } catch (err) {
+        console.error("[booking] Failed to parse SLOTS_REQUEST:", err);
       }
     }
+
+    const bookingMatch = response.text.match(/BOOKING_REQUEST:\s*(\{[^}]+\})/);
+    if (bookingMatch) {
+      try {
+        const req = JSON.parse(bookingMatch[1]);
+        const service = services.find((s) => s.id === req.serviceId) ?? services[0];
+        if (!service) {
+          return {
+            reply: "I couldn't find that service. Could you let me know which service you'd like to book?",
+            confidence: 0.85,
+            skillId: "booking",
+          };
+        }
+
+        const slotAt = new Date(`${req.date}T${req.time}:00`);
+
+        const result = await bookSlot({
+          businessId: ctx.businessId,
+          serviceId: service.id,
+          slotAt,
+          customerPhone: ctx.customerPhone,
+          conversationId: ctx.conversationId,
+          timezone: ctx.timezone,
+        });
+
+        if (result.success) {
+          const slotDisplay = new Intl.DateTimeFormat("en-IN", {
+            timeZone: ctx.timezone,
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }).format(slotAt);
+
+          if (result.status === "pending") {
+            return {
+              reply: `Your *${service.name}* booking for *${slotDisplay}* has been queued. We'll notify you once it's confirmed!`,
+              confidence: 0.95,
+              sideEffects: [{ type: "booking_pending", payload: { appointmentId: result.appointmentId } }],
+              skillId: "booking",
+            };
+          }
+          return {
+            reply: `Your *${service.name}* is confirmed for *${slotDisplay}*! We look forward to seeing you.`,
+            confidence: 0.95,
+            sideEffects: [{ type: "booking_confirmed", payload: { appointmentId: result.appointmentId } }],
+            skillId: "booking",
+          };
+        }
+
+        const alternatives = await suggestAlternatives({
+          businessId: ctx.businessId,
+          serviceId: service.id,
+          preferredDate: slotAt,
+          timezone: ctx.timezone,
+        });
+
+        if (alternatives.length > 0) {
+          return {
+            reply: `Sorry, that time slot isn't available for *${service.name}*. Here are some alternatives:\n\n${formatSlotsList(alternatives, ctx.timezone)}\n\nWould any of these work for you?`,
+            confidence: 0.9,
+            skillId: "booking",
+          };
+        }
+
+        return {
+          reply: `Sorry, that time isn't available for ${service.name} and I couldn't find nearby alternatives. Could you try a different day?`,
+          confidence: 0.85,
+          skillId: "booking",
+        };
+      } catch (err) {
+        console.error("[booking] Failed to parse BOOKING_REQUEST:", err);
+      }
+    }
+
+    const replyText = response.text
+      .replace(/BOOKING_REQUEST:\s*\{[^}]+\}\s*/g, "")
+      .replace(/SLOTS_REQUEST:\s*\{[^}]+\}\s*/g, "")
+      .trim();
 
     return {
       reply: replyText,
       confidence: 0.88,
-      sideEffects,
       skillId: "booking",
     };
   },
 };
+
+async function getUpcomingSlotsForDisplay(
+  businessId: string,
+  serviceId: string,
+  timezone: string,
+  count: number,
+): Promise<TimeSlot[]> {
+  const all: TimeSlot[] = [];
+  for (let dayOffset = 0; dayOffset <= 7 && all.length < count; dayOffset++) {
+    const date = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000);
+    const daySlots = await getAvailableSlots({ businessId, serviceId, date, timezone });
+    const spread = pickSpread(daySlots, Math.min(3, count - all.length));
+    all.push(...spread);
+  }
+  return all.slice(0, count);
+}
+
+function pickSpread(slots: TimeSlot[], count: number): TimeSlot[] {
+  if (slots.length <= count) return slots;
+  const step = Math.floor(slots.length / count);
+  return Array.from({ length: count }, (_, i) => slots[Math.min(i * step, slots.length - 1)]);
+}

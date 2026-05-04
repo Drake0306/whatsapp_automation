@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { verticals, getVertical } from "$lib/config/verticals.js";
 
 describe("verticals config", () => {
-  it("has all five verticals", () => {
+  it("has all seven verticals", () => {
     expect(Object.keys(verticals).sort()).toEqual(
-      ["clinic", "coaching", "other", "retail", "salon"],
+      ["clinic", "coaching", "gym", "other", "restaurant", "retail", "salon"],
     );
   });
 
@@ -35,6 +35,18 @@ describe("verticals config", () => {
 
   it("retail has no appointment types", () => {
     expect(verticals.retail.appointmentTypes).toHaveLength(0);
+  });
+
+  it("restaurant uses queue booking mode", () => {
+    for (const apt of verticals.restaurant.appointmentTypes) {
+      expect(apt.defaultBookingMode).toBe("queue");
+    }
+  });
+
+  it("gym has group class with capacity", () => {
+    const group = verticals.gym.appointmentTypes.find((a) => a.id === "group_class");
+    expect(group).toBeDefined();
+    expect(group!.defaultCapacity).toBe(20);
   });
 });
 

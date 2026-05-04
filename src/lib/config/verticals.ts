@@ -1,9 +1,17 @@
+export interface AppointmentType {
+  id: string;
+  label: string;
+  defaultDuration: number;
+  defaultCapacity?: number;
+  defaultBookingMode?: "instant" | "queue";
+}
+
 export interface VerticalConfig {
   id: string;
   name: string;
   description: string;
   defaultSkills: string[];
-  appointmentTypes: { id: string; label: string; defaultDuration: number }[];
+  appointmentTypes: AppointmentType[];
   rebookDays: number;
   extraFields?: { key: string; label: string; type: "text" | "number" }[];
 }
@@ -64,6 +72,43 @@ export const verticals: Record<string, VerticalConfig> = {
       { key: "doctorName", label: "Doctor Name", type: "text" },
       { key: "gstNumber", label: "GST Number", type: "text" },
     ],
+  },
+  restaurant: {
+    id: "restaurant",
+    name: "Restaurant",
+    description: "Restaurants, cafes, and food establishments",
+    defaultSkills: [
+      "faq",
+      "booking",
+      "cancel",
+      "fallback",
+      "escalate",
+    ],
+    appointmentTypes: [
+      { id: "dine_in", label: "Dine-in Table", defaultDuration: 90, defaultCapacity: 20, defaultBookingMode: "queue" },
+      { id: "reservation", label: "Reservation", defaultDuration: 120, defaultCapacity: 10, defaultBookingMode: "queue" },
+    ],
+    rebookDays: 14,
+  },
+  gym: {
+    id: "gym",
+    name: "Gym / Fitness",
+    description: "Gyms, yoga studios, and fitness centres",
+    defaultSkills: [
+      "faq",
+      "booking",
+      "reschedule",
+      "cancel",
+      "reminder",
+      "fallback",
+      "escalate",
+    ],
+    appointmentTypes: [
+      { id: "personal_training", label: "Personal Training", defaultDuration: 60 },
+      { id: "group_class", label: "Group Class", defaultDuration: 60, defaultCapacity: 20, defaultBookingMode: "instant" },
+      { id: "consultation", label: "Fitness Consultation", defaultDuration: 30 },
+    ],
+    rebookDays: 7,
   },
   coaching: {
     id: "coaching",
