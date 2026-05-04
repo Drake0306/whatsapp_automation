@@ -11,7 +11,7 @@ export const models: Record<string, ModelConfig> = {
   "gemini-flash": {
     id: "gemini-flash",
     provider: "gemini",
-    apiModelId: "gemini-2.5-flash-preview-05-20",
+    apiModelId: "gemini-2.5-flash",
     contextWindow: 1_000_000,
     costPer1kInput: 0,
     costPer1kOutput: 0,
