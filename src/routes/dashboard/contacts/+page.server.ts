@@ -9,6 +9,7 @@ import {
   appointments,
 } from "$lib/server/db/schema.js";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
+import { normalizePhone } from "$lib/server/phone.js";
 
 export const load: PageServerLoad = async (event) => {
   const session = await event.locals.auth();
@@ -103,11 +104,12 @@ export const actions: Actions = {
     if (!session?.user?.id) return fail(401);
 
     const form = await request.formData();
-    const phone = (form.get("phone") as string)?.trim();
+    const rawPhone = (form.get("phone") as string)?.trim();
     const name = (form.get("name") as string)?.trim() || null;
     const email = (form.get("email") as string)?.trim() || null;
 
-    if (!phone) return fail(400, { error: "Phone number is required" });
+    if (!rawPhone) return fail(400, { error: "Phone number is required" });
+    const phone = normalizePhone(rawPhone);
 
     const [business] = await db
       .select()

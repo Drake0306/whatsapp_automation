@@ -68,7 +68,7 @@
           <input
             name="phone"
             type="text"
-            placeholder="Phone (e.g. 919876543210)"
+            placeholder="Phone (e.g. 9876543210 or 919876543210)"
             required
             class="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
