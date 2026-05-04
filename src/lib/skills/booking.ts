@@ -162,7 +162,9 @@ RULES:
 - If both service and time are clear, respond with:
   BOOKING_REQUEST: {"serviceId": "<id>", "serviceName": "<name>", "date": "YYYY-MM-DD", "time": "HH:MM"}
   followed by a brief "Let me check that for you..." message.
-- Do NOT confirm the booking yourself. The system will handle availability and confirm.
+- CRITICAL: NEVER say a booking is confirmed, scheduled, or done. Only the system can confirm bookings.
+  You MUST use BOOKING_REQUEST to trigger a booking — plain text confirmations are FAKE and will not create an appointment.
+  If the customer insists a slot is available, re-emit the BOOKING_REQUEST tag so the system can retry.
 - Be conversational and helpful. Use the customer's language when possible.`;
 
     const systemPrompt = buildSystemPrompt(
@@ -305,14 +307,20 @@ RULES:
       }
     }
 
-    const replyText = response.text
+    let replyText = response.text
       .replace(/BOOKING_REQUEST:\s*\{[^}]+\}\s*/g, "")
       .replace(/SLOTS_REQUEST:\s*\{[^}]+\}\s*/g, "")
       .trim();
 
+    const falseConfirmation = /\b(confirmed|booked|scheduled|appointment is set)\b/i.test(replyText);
+    if (falseConfirmation) {
+      console.warn("[booking] LLM generated fake confirmation without BOOKING_REQUEST — replacing");
+      replyText = "I wasn't able to complete the booking just now. Could you tell me the service and time again so I can check availability?";
+    }
+
     return {
       reply: replyText,
-      confidence: 0.88,
+      confidence: falseConfirmation ? 0.5 : 0.88,
       skillId: "booking",
     };
   },
