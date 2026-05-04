@@ -6,6 +6,7 @@
   let saving = $state(false);
 
   const business = $derived($page.data.business);
+  const formError = $derived($page.form?.error as string | undefined);
 
   let name = $state($page.data.business?.name ?? "");
   let vertical = $state($page.data.business?.vertical ?? "salon");
@@ -103,6 +104,12 @@
       {/each}
     </div>
 
+    {#if formError}
+      <div class="mt-4 rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+        {formError}
+      </div>
+    {/if}
+
     <div class="mt-8">
       <!-- Step 1: Business Info -->
       {#if step === 1}
@@ -111,10 +118,10 @@
           action="?/save-business-info"
           use:enhance={() => {
             saving = true;
-            return async ({ update }) => {
+            return async ({ result, update }) => {
               await update();
               saving = false;
-              nextStep();
+              if (result.type === "success") nextStep();
             };
           }}
         >
@@ -198,10 +205,10 @@
           action="?/save-whatsapp"
           use:enhance={() => {
             saving = true;
-            return async ({ update }) => {
+            return async ({ result, update }) => {
               await update();
               saving = false;
-              nextStep();
+              if (result.type === "success") nextStep();
             };
           }}
         >
@@ -339,10 +346,10 @@
           action="?/save-tone"
           use:enhance={() => {
             saving = true;
-            return async ({ update }) => {
+            return async ({ result, update }) => {
               await update();
               saving = false;
-              nextStep();
+              if (result.type === "success") nextStep();
             };
           }}
         >

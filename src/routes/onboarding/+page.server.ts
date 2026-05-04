@@ -103,10 +103,18 @@ export const actions: Actions = {
 
     if (!business) return fail(400, { error: "No business found" });
 
-    await db
-      .update(businesses)
-      .set({ whatsappPhoneNumberId: phoneNumberId })
-      .where(eq(businesses.id, business.id));
+    try {
+      await db
+        .update(businesses)
+        .set({ whatsappPhoneNumberId: phoneNumberId })
+        .where(eq(businesses.id, business.id));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("Duplicate")) {
+        return fail(400, { error: "This Phone Number ID is already registered to another business" });
+      }
+      return fail(500, { error: "Failed to save WhatsApp configuration" });
+    }
 
     return { success: true };
   },
