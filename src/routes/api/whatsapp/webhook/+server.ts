@@ -116,15 +116,25 @@ export const POST: RequestHandler = async ({ request }) => {
     }
   }
 
-  const customerMsgId = crypto.randomUUID();
   await db.insert(messages).values({
-    id: customerMsgId,
     conversationId: conversation.id,
     direction: "in",
     role: "customer",
     text: incoming.text?.body ?? null,
     raw: body,
   });
+
+  const [customerMsg] = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.conversationId, conversation.id),
+        eq(messages.direction, "in"),
+      ),
+    )
+    .orderBy(sql`${messages.createdAt} desc`)
+    .limit(1);
 
   await db
     .update(conversations)
@@ -194,10 +204,10 @@ export const POST: RequestHandler = async ({ request }) => {
       needsReview: result.needsReview ?? false,
     });
 
-    if (result.needsReview) {
+    if (result.needsReview && customerMsg) {
       await db.insert(escalations).values({
         businessId: business.id,
-        messageId: customerMsgId,
+        messageId: customerMsg.id,
         proposedReply: result.reply,
         confidence: result.confidence,
       });
