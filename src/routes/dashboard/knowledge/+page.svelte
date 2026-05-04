@@ -122,7 +122,7 @@ ADDITIONAL INFO
     <!-- Action buttons -->
     <div class="mt-6 grid gap-3 sm:grid-cols-3">
       <!-- Upload file -->
-      <div class="rounded-lg border p-4 text-center">
+      <div class="rounded-lg border p-4 text-center hover:bg-accent transition-colors">
         <input
           bind:this={fileInput}
           type="file"
@@ -133,7 +133,9 @@ ADDITIONAL INFO
           id="kb-upload"
         />
         <label for="kb-upload" class="block cursor-pointer">
-          <span class="text-2xl">📄</span>
+          <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+            <svg class="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          </div>
           <p class="mt-2 text-sm font-medium">
             {uploading ? "Uploading..." : "Upload File"}
           </p>
@@ -146,7 +148,9 @@ ADDITIONAL INFO
         onclick={() => { showEditor = true; }}
         class="rounded-lg border p-4 text-center hover:bg-accent transition-colors"
       >
-        <span class="text-2xl">✏️</span>
+        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+          <svg class="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </div>
         <p class="mt-2 text-sm font-medium">Write Directly</p>
         <p class="mt-1 text-xs text-muted-foreground">Type or paste content</p>
       </button>
@@ -156,7 +160,9 @@ ADDITIONAL INFO
         onclick={downloadTemplate}
         class="rounded-lg border p-4 text-center hover:bg-accent transition-colors"
       >
-        <span class="text-2xl">📋</span>
+        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+          <svg class="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        </div>
         <p class="mt-2 text-sm font-medium">Download Template</p>
         <p class="mt-1 text-xs text-muted-foreground">Fill in and upload</p>
       </button>
