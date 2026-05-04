@@ -26,7 +26,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 export const POST: RequestHandler = async ({ request }) => {
   const rawBody = await request.text();
-  console.log("[webhook] POST received");
+  console.log("[webhook] POST received, body:", rawBody.substring(0, 500));
 
   const signature = request.headers.get("x-hub-signature-256");
   const appSecret = env.WHATSAPP_APP_SECRET;

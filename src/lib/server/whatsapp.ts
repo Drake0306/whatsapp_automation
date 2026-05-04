@@ -15,8 +15,8 @@ function getConfig(): WhatsAppConfig {
 
   const apiUrl =
     mode === "direct"
-      ? env.WHATSAPP_API_URL || "https://graph.facebook.com/v21.0"
-      : env.WHATSAPP_BSP_API_URL || env.WHATSAPP_API_URL || "https://graph.facebook.com/v20.0";
+      ? env.WHATSAPP_API_URL || "https://graph.facebook.com/v22.0"
+      : env.WHATSAPP_BSP_API_URL || env.WHATSAPP_API_URL || "https://graph.facebook.com/v22.0";
 
   return { mode, apiToken, apiUrl };
 }
