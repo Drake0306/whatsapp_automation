@@ -59,10 +59,18 @@ WhatsAppFlow — SvelteKit 2 SaaS platform. AI WhatsApp automation for Indian sm
 ### Global Navigation Bar
 - `src/routes/+layout.svelte` — animated loading bar at top using `$navigating` store
 
-### Styling
+### Styling & Component Library
 - Tailwind CSS 4 with `@tailwindcss/vite` plugin
 - Custom CSS variables for theming (`--primary`, `--muted`, `--accent`, etc.) in `app.css`
-- No component library — all UI is plain Tailwind utility classes
+- **shadcn-svelte** (https://www.shadcn-svelte.com/docs/components) for UI components
+  - Config: `components.json` (base color: zinc, style: default)
+  - Installed components: `badge`, `select`, `tabs`, `separator`
+  - Component path: `src/lib/components/ui/`
+  - Utility: `src/lib/utils.ts` — `cn()` helper, `WithElementRef`, `WithoutChild` types
+  - Dependencies: `bits-ui`, `clsx`, `tailwind-merge`, `tailwind-variants`, `@lucide/svelte`
+  - Add new components via: `npx shadcn-svelte@latest add <component> --yes`
+  - Browse available components: https://www.shadcn-svelte.com/docs/components
+- Plain Tailwind utility classes for custom layouts; shadcn components for interactive elements (badges, selects, tabs, etc.)
 
 ## Auth
 - Auth.js (`@auth/sveltekit`) with Google OAuth + Nodemailer (magic link)
@@ -164,6 +172,12 @@ WHATSAPP_BSP_API_URL=""                          # leave blank unless using a BS
 - Intent classifier: `src/lib/skills/classifier.ts`
 - LLM clients: `src/lib/server/llm.ts`
 - Model config: `src/lib/config/models.ts`
+- Super admin guard: `src/lib/server/admin.ts`
+- Super admin dashboard: `src/routes/admin/+page.svelte`
+- Admin invite flow: `src/routes/admin/invite/+page.svelte`
+- Admin login: `src/routes/admin/login/+page.svelte`
+- Email utility: `src/lib/server/email.ts`
+- shadcn components: `src/lib/components/ui/`
 - Seed script: `scripts/seed.ts`
 - CI workflow: `.github/workflows/ci.yml`
 - Env example: `.env.example`
