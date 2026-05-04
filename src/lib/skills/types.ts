@@ -7,6 +7,11 @@ export type Intent =
   | "talk_to_owner"
   | "other";
 
+export interface ChatMessage {
+  role: "customer" | "bot";
+  text: string;
+}
+
 export interface SkillContext {
   businessId: string;
   businessName: string;
@@ -15,6 +20,7 @@ export interface SkillContext {
   customerPhone: string;
   conversationId: string;
   conversationState: Record<string, unknown>;
+  history: ChatMessage[];
   tone?: {
     greetingStyle?: string | null;
     formalityLevel: string;

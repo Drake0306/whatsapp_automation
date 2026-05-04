@@ -73,11 +73,21 @@ followed by a friendly confirmation message.`;
       skillContext,
     );
 
-    const modelId = skillRouting["booking"];
-    const response = await callLlm(modelId, [
+    const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: systemPrompt },
-      { role: "user", content: msg.text },
-    ]);
+    ];
+
+    for (const h of ctx.history.slice(0, -1)) {
+      chatMessages.push({
+        role: h.role === "customer" ? "user" : "assistant",
+        content: h.text,
+      });
+    }
+
+    chatMessages.push({ role: "user", content: msg.text });
+
+    const modelId = skillRouting["booking"];
+    const response = await callLlm(modelId, chatMessages);
 
     const confirmMatch = response.text.match(
       /BOOKING_CONFIRM:\s*(\{[^}]+\})/,

@@ -116,7 +116,9 @@ export const POST: RequestHandler = async ({ request }) => {
     }
   }
 
+  const customerMsgId = crypto.randomUUID();
   await db.insert(messages).values({
+    id: customerMsgId,
     conversationId: conversation.id,
     direction: "in",
     role: "customer",
@@ -137,6 +139,21 @@ export const POST: RequestHandler = async ({ request }) => {
     .where(eq(businessToneConfig.businessId, business.id))
     .limit(1);
 
+  const recentMessages = await db
+    .select({ role: messages.role, text: messages.text })
+    .from(messages)
+    .where(eq(messages.conversationId, conversation.id))
+    .orderBy(sql`${messages.createdAt} desc`)
+    .limit(10);
+
+  const history = recentMessages
+    .reverse()
+    .filter((m) => m.text)
+    .map((m) => ({
+      role: m.role as "customer" | "bot",
+      text: m.text!,
+    }));
+
   const ctx: SkillContext = {
     businessId: business.id,
     businessName: business.name,
@@ -145,6 +162,7 @@ export const POST: RequestHandler = async ({ request }) => {
     customerPhone: incoming.from,
     conversationId: conversation.id,
     conversationState: (conversation.state as Record<string, unknown>) ?? {},
+    history,
     tone: tone ?? null,
   };
 
@@ -177,21 +195,12 @@ export const POST: RequestHandler = async ({ request }) => {
     });
 
     if (result.needsReview) {
-      const [lastMsg] = await db
-        .select({ id: messages.id })
-        .from(messages)
-        .where(eq(messages.conversationId, conversation.id))
-        .orderBy(sql`${messages.createdAt} desc`)
-        .limit(1);
-
-      if (lastMsg) {
-        await db.insert(escalations).values({
-          businessId: business.id,
-          messageId: lastMsg.id,
-          proposedReply: result.reply,
-          confidence: result.confidence,
-        });
-      }
+      await db.insert(escalations).values({
+        businessId: business.id,
+        messageId: customerMsgId,
+        proposedReply: result.reply,
+        confidence: result.confidence,
+      });
     }
   }
 
