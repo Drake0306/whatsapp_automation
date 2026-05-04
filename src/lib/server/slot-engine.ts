@@ -112,10 +112,12 @@ export async function getAvailableSlots(params: {
     .where(and(eq(businessHours.businessId, businessId), eq(businessHours.dayOfWeek, localDate.dayOfWeek)))
     .limit(1);
 
-  if (!hours || hours.isClosed) return [];
+  if (hours?.isClosed) return [];
 
-  const dayOpen = localTimeToUtc(localDate, hours.openTime, timezone);
-  const dayClose = localTimeToUtc(localDate, hours.closeTime, timezone);
+  const openTime = hours?.openTime ?? "09:00";
+  const closeTime = hours?.closeTime ?? "20:00";
+  const dayOpen = localTimeToUtc(localDate, openTime, timezone);
+  const dayClose = localTimeToUtc(localDate, closeTime, timezone);
 
   const existingAppts = await db
     .select({ slotAt: appointments.slotAt, durationMin: appointments.durationMin })
@@ -193,7 +195,16 @@ export async function checkSlotAvailable(params: {
     .where(and(eq(businessHours.businessId, businessId), eq(businessHours.dayOfWeek, localDate.dayOfWeek)))
     .limit(1);
 
-  if (!hours || hours.isClosed) return { available: false, conflictCount: 0, capacity: service.capacity };
+  if (hours?.isClosed) return { available: false, conflictCount: 0, capacity: service.capacity };
+
+  const openTime = hours?.openTime ?? "09:00";
+  const closeTime = hours?.closeTime ?? "20:00";
+  const dayOpen = localTimeToUtc(localDate, openTime, timezone);
+  const dayClose = localTimeToUtc(localDate, closeTime, timezone);
+
+  if (slotAt < dayOpen || addMinutes(slotAt, service.durationMin) > dayClose) {
+    return { available: false, conflictCount: 0, capacity: service.capacity };
+  }
 
   const slotEnd = addMinutes(slotAt, service.durationMin);
 

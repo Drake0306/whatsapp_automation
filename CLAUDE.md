@@ -2,6 +2,11 @@
 
 Project-level instructions for Claude Code when working on this codebase.
 
+## Git Rules
+
+- Do NOT add `Co-Authored-By` to commit messages
+- Push directly to main unless told otherwise
+
 ## Project
 
 WhatsAppFlow — SvelteKit 2 SaaS platform. AI WhatsApp automation for Indian small businesses.

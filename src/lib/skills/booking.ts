@@ -164,7 +164,9 @@ RULES:
   followed by a brief "Let me check that for you..." message.
 - CRITICAL: NEVER say a booking is confirmed, scheduled, or done. Only the system can confirm bookings.
   You MUST use BOOKING_REQUEST to trigger a booking — plain text confirmations are FAKE and will not create an appointment.
-  If the customer insists a slot is available, re-emit the BOOKING_REQUEST tag so the system can retry.
+- CRITICAL: NEVER judge availability yourself. Do NOT tell the customer a slot is unavailable based on business hours.
+  ALWAYS emit BOOKING_REQUEST and let the system check — you cannot know current capacity, blocks, or real-time availability.
+  If the customer asks for ANY time, emit BOOKING_REQUEST. The system will handle "not available" responses.
 - Be conversational and helpful. Use the customer's language when possible.`;
 
     const systemPrompt = buildSystemPrompt(
