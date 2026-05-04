@@ -45,7 +45,7 @@ function toLocalDate(utcDate: Date, timezone: string): { year: number; month: nu
   };
 }
 
-function localTimeToUtc(date: { year: number; month: number; day: number }, time: string, timezone: string): Date {
+export function localTimeToUtc(date: { year: number; month: number; day: number }, time: string, timezone: string): Date {
   const [h, m] = time.split(":").map(Number);
   const iso = `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
 

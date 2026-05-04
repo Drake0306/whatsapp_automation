@@ -4,6 +4,8 @@ import {
   verifyWebhookSignature,
   parseIncomingMessage,
   sendWhatsAppMessage,
+  sendWhatsAppInteractiveList,
+  sendWhatsAppReplyButtons,
 } from "$lib/server/whatsapp.js";
 import { db } from "$lib/server/db/index.js";
 import { businesses, conversations, messages, escalations, businessToneConfig, contacts } from "$lib/server/db/schema.js";
@@ -142,6 +144,7 @@ export const POST: RequestHandler = async ({ request }) => {
     .where(eq(conversations.id, conversation.id));
 
   const messageText = incoming.text?.body ?? "";
+  const interactiveId = incoming.interactive?.id;
 
   const [tone] = await db
     .select()
@@ -180,27 +183,55 @@ export const POST: RequestHandler = async ({ request }) => {
   let result;
   try {
     console.log(`[webhook] Routing message to skill router...`);
-    result = await routeMessage({ text: messageText, raw: body }, ctx);
+    result = await routeMessage({ text: messageText, raw: body, interactiveId }, ctx);
     console.log(`[webhook] Skill result: skill=${result.skillId}, confidence=${result.confidence}, hasReply=${!!result.reply}`);
   } catch (err) {
     console.error("[webhook] routeMessage failed:", err);
     return json({ status: "ok" }, { status: 200 });
   }
 
-  if (result.reply) {
-    console.log(`[webhook] Sending reply (${result.reply.length} chars) to ${incoming.from}`);
-    const sent = await sendWhatsAppMessage(
-      incoming.phoneNumberId,
-      incoming.from,
-      result.reply,
-    );
-    console.log(`[webhook] sendWhatsAppMessage result: ${sent ? "SUCCESS" : "FAILED"}`);
+  if (result.reply || result.interactive) {
+    let sent = false;
+    const replyText = result.reply ?? result.interactive?.bodyText ?? "";
+
+    if (result.interactive?.type === "list") {
+      console.log(`[webhook] Sending interactive list to ${incoming.from}`);
+      sent = await sendWhatsAppInteractiveList(
+        incoming.phoneNumberId,
+        incoming.from,
+        result.interactive.bodyText,
+        result.interactive.buttonText,
+        result.interactive.sections,
+        result.interactive.headerText,
+        result.interactive.footerText,
+      );
+      if (!sent) {
+        sent = await sendWhatsAppMessage(incoming.phoneNumberId, incoming.from, replyText);
+      }
+    } else if (result.interactive?.type === "buttons") {
+      console.log(`[webhook] Sending reply buttons to ${incoming.from}`);
+      sent = await sendWhatsAppReplyButtons(
+        incoming.phoneNumberId,
+        incoming.from,
+        result.interactive.bodyText,
+        result.interactive.buttons,
+        result.interactive.headerText,
+        result.interactive.footerText,
+      );
+      if (!sent) {
+        sent = await sendWhatsAppMessage(incoming.phoneNumberId, incoming.from, replyText);
+      }
+    } else if (result.reply) {
+      console.log(`[webhook] Sending reply (${result.reply.length} chars) to ${incoming.from}`);
+      sent = await sendWhatsAppMessage(incoming.phoneNumberId, incoming.from, result.reply);
+    }
+    console.log(`[webhook] send result: ${sent ? "SUCCESS" : "FAILED"}`);
 
     await db.insert(messages).values({
       conversationId: conversation.id,
       direction: "out",
       role: "bot",
-      text: result.reply,
+      text: replyText,
       skillId: result.skillId,
       needsReview: result.needsReview ?? false,
     });
@@ -209,7 +240,7 @@ export const POST: RequestHandler = async ({ request }) => {
       await db.insert(escalations).values({
         businessId: business.id,
         messageId: customerMsg.id,
-        proposedReply: result.reply,
+        proposedReply: replyText,
         confidence: result.confidence,
       });
     }

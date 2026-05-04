@@ -16,6 +16,13 @@ import { eq, and } from "drizzle-orm";
 
 const CONFIDENCE_THRESHOLD = 0.85;
 
+function applyReviewThreshold(result: SkillResult): SkillResult {
+  if (result.confidence < CONFIDENCE_THRESHOLD && !result.needsReview) {
+    result.needsReview = true;
+  }
+  return result;
+}
+
 const SKILL_REGISTRY: Record<string, Skill> = {
   faq: faqSkill,
   booking: bookingSkill,
@@ -55,6 +62,22 @@ export async function routeMessage(
   msg: IncomingMessage,
   ctx: SkillContext,
 ): Promise<SkillResult> {
+  if (msg.interactiveId?.startsWith("book_")) {
+    return applyReviewThreshold(await bookingSkill.handle(msg, ctx));
+  }
+
+  if (msg.interactiveId === "action_book") {
+    return applyReviewThreshold(await bookingSkill.handle({ ...msg, text: "I'd like to book an appointment" }, ctx));
+  }
+
+  if (msg.interactiveId === "action_menu") {
+    return applyReviewThreshold(await faqSkill.handle({ ...msg, text: "What services do you offer and what are the prices?" }, ctx));
+  }
+
+  if (msg.interactiveId === "action_question") {
+    return applyReviewThreshold(await faqSkill.handle({ ...msg, text: "I have a question" }, ctx));
+  }
+
   const intent = await classifyIntent(msg.text);
   const skills = await getEnabledSkills(ctx.businessId);
 
@@ -65,10 +88,5 @@ export async function routeMessage(
 
   const best = scored[0] ?? { skill: fallbackSkill, score: 0.1 };
   const result = await best.skill.handle(msg, ctx);
-
-  if (result.confidence < CONFIDENCE_THRESHOLD && !result.needsReview) {
-    result.needsReview = true;
-  }
-
-  return result;
+  return applyReviewThreshold(result);
 }

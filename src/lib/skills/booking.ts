@@ -10,6 +10,7 @@ import {
   getAvailableSlots,
   bookSlot,
   suggestAlternatives,
+  localTimeToUtc,
   type TimeSlot,
 } from "$lib/server/slot-engine.js";
 
@@ -30,6 +31,34 @@ function formatSlotsList(slots: TimeSlot[], timezone: string): string {
   return slots.map((s, i) => `${i + 1}. ${formatSlot(s, timezone)}`).join("\n");
 }
 
+function truncate(str: string, max: number): string {
+  return str.length > max ? str.slice(0, max - 1) + "…" : str;
+}
+
+function slotsToInteractiveList(slots: TimeSlot[], serviceName: string, serviceId: string, timezone: string) {
+  const grouped: Record<string, TimeSlot[]> = {};
+  for (const slot of slots) {
+    const dayLabel = new Intl.DateTimeFormat("en-IN", { timeZone: timezone, weekday: "long", day: "numeric", month: "short" }).format(slot.startAt);
+    if (!grouped[dayLabel]) grouped[dayLabel] = [];
+    grouped[dayLabel].push(slot);
+  }
+
+  const sections = Object.entries(grouped).map(([dayLabel, daySlots]) => ({
+    title: truncate(dayLabel, 24),
+    rows: daySlots.map((s) => {
+      const timeStr = new Intl.DateTimeFormat("en-IN", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hour12: true }).format(s.startAt);
+      const isoDate = s.startAt.toISOString();
+      return {
+        id: `book_${serviceId}_${isoDate}`.slice(0, 200),
+        title: truncate(timeStr, 24),
+        description: truncate(serviceName, 72),
+      };
+    }),
+  }));
+
+  return sections.slice(0, 10);
+}
+
 export const bookingSkill: Skill = {
   id: "booking",
 
@@ -39,6 +68,62 @@ export const bookingSkill: Skill = {
   },
 
   async handle(msg: IncomingMessage, ctx: SkillContext): Promise<SkillResult> {
+    if (msg.interactiveId?.startsWith("book_")) {
+      const interactiveId = msg.interactiveId;
+      const parts = interactiveId.split("_");
+      const serviceId = parts[1];
+      const isoDate = parts.slice(2).join("_");
+      const slotAt = new Date(isoDate);
+
+      const allServices = await getActiveServices(ctx.businessId);
+      const service = allServices.find((s) => s.id === serviceId) ?? allServices[0];
+      if (!service) {
+        return { reply: "Sorry, that service is no longer available.", confidence: 0.85, skillId: "booking" };
+      }
+
+      const result = await bookSlot({
+        businessId: ctx.businessId,
+        serviceId: service.id,
+        slotAt,
+        customerPhone: ctx.customerPhone,
+        conversationId: ctx.conversationId,
+        timezone: ctx.timezone,
+      });
+
+      if (result.success) {
+        const slotDisplay = new Intl.DateTimeFormat("en-IN", {
+          timeZone: ctx.timezone,
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }).format(slotAt);
+
+        if (result.status === "pending") {
+          return {
+            reply: `Your *${service.name}* booking for *${slotDisplay}* has been queued. We'll notify you once it's confirmed!`,
+            confidence: 0.95,
+            sideEffects: [{ type: "booking_pending", payload: { appointmentId: result.appointmentId } }],
+            skillId: "booking",
+          };
+        }
+        return {
+          reply: `Your *${service.name}* is confirmed for *${slotDisplay}*! We look forward to seeing you.`,
+          confidence: 0.95,
+          sideEffects: [{ type: "booking_confirmed", payload: { appointmentId: result.appointmentId } }],
+          skillId: "booking",
+        };
+      }
+
+      return {
+        reply: `Sorry, that slot was just taken. Would you like to try another time?`,
+        confidence: 0.85,
+        skillId: "booking",
+      };
+    }
+
     const services = await getActiveServices(ctx.businessId);
 
     const hoursRows = await db
@@ -107,10 +192,22 @@ RULES:
         const req = JSON.parse(slotsMatch[1]);
         const service = services.find((s) => s.id === req.serviceId) ?? services[0];
         if (service) {
-          const upcoming = await getUpcomingSlotsForDisplay(ctx.businessId, service.id, ctx.timezone, 6);
+          const upcoming = await getUpcomingSlotsForDisplay(ctx.businessId, service.id, ctx.timezone, 10);
           if (upcoming.length > 0) {
-            const reply = `Here are the available slots for *${service.name}*:\n\n${formatSlotsList(upcoming, ctx.timezone)}\n\nPlease let me know which time works for you, or suggest a different time.`;
-            return { reply, confidence: 0.9, skillId: "booking" };
+            const sections = slotsToInteractiveList(upcoming, service.name, service.id, ctx.timezone);
+            return {
+              reply: `Here are the available slots for *${service.name}*:\n\n${formatSlotsList(upcoming, ctx.timezone)}\n\nTap below to pick a slot, or tell me a different time.`,
+              interactive: {
+                type: "list",
+                bodyText: `Available slots for ${service.name}`,
+                buttonText: "View Slots",
+                sections,
+                headerText: truncate(`Book ${service.name}`, 60),
+                footerText: "Tap a slot to book instantly",
+              },
+              confidence: 0.9,
+              skillId: "booking",
+            };
           }
           return {
             reply: `Sorry, there are no available slots for ${service.name} in the next few days. Would you like to try a different service or time?`,
@@ -136,7 +233,8 @@ RULES:
           };
         }
 
-        const slotAt = new Date(`${req.date}T${req.time}:00`);
+        const [year, month, day] = req.date.split("-").map(Number);
+        const slotAt = localTimeToUtc({ year, month, day }, req.time, ctx.timezone);
 
         const result = await bookSlot({
           businessId: ctx.businessId,
@@ -182,8 +280,16 @@ RULES:
         });
 
         if (alternatives.length > 0) {
+          const sections = slotsToInteractiveList(alternatives, service.name, service.id, ctx.timezone);
           return {
-            reply: `Sorry, that time slot isn't available for *${service.name}*. Here are some alternatives:\n\n${formatSlotsList(alternatives, ctx.timezone)}\n\nWould any of these work for you?`,
+            reply: `Sorry, that time slot isn't available for *${service.name}*. Here are some alternatives:\n\n${formatSlotsList(alternatives, ctx.timezone)}\n\nTap below to pick one, or suggest a different time.`,
+            interactive: {
+              type: "list",
+              bodyText: `That slot isn't available. Here are alternatives for ${service.name}:`,
+              buttonText: "View Alternatives",
+              sections,
+              headerText: truncate(`${service.name} — Alternatives`, 60),
+            },
             confidence: 0.9,
             skillId: "booking",
           };

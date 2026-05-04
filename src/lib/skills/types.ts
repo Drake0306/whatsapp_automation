@@ -32,6 +32,7 @@ export interface SkillContext {
 export interface IncomingMessage {
   text: string;
   raw?: unknown;
+  interactiveId?: string;
 }
 
 export interface SideEffect {
@@ -39,8 +40,28 @@ export interface SideEffect {
   payload: Record<string, unknown>;
 }
 
+export interface InteractiveListPayload {
+  type: "list";
+  bodyText: string;
+  buttonText: string;
+  sections: { title: string; rows: { id: string; title: string; description?: string }[] }[];
+  headerText?: string;
+  footerText?: string;
+}
+
+export interface ReplyButtonsPayload {
+  type: "buttons";
+  bodyText: string;
+  buttons: { id: string; title: string }[];
+  headerText?: string;
+  footerText?: string;
+}
+
+export type InteractivePayload = InteractiveListPayload | ReplyButtonsPayload;
+
 export interface SkillResult {
   reply?: string;
+  interactive?: InteractivePayload;
   state?: Record<string, unknown>;
   sideEffects?: SideEffect[];
   confidence: number;

@@ -40,12 +40,20 @@ export function verifyWebhookSignature(
   );
 }
 
+export interface InteractiveReply {
+  type: "list_reply" | "button_reply";
+  id: string;
+  title: string;
+  description?: string;
+}
+
 export interface WhatsAppIncomingMessage {
   from: string;
   id: string;
   timestamp: string;
   type: string;
   text?: { body: string };
+  interactive?: InteractiveReply;
   phoneNumberId: string;
 }
 
@@ -62,12 +70,29 @@ export function parseIncomingMessage(
     if (!messageList || messageList.length === 0) return null;
 
     const msg = messageList[0];
+    const msgType = msg.type as string;
+
+    let textBody = msg.text as { body: string } | undefined;
+    let interactiveReply: InteractiveReply | undefined;
+
+    if (msgType === "interactive") {
+      const ir = msg.interactive as Record<string, Record<string, string>> | undefined;
+      if (ir?.list_reply) {
+        interactiveReply = { type: "list_reply", id: ir.list_reply.id, title: ir.list_reply.title, description: ir.list_reply.description };
+        textBody = { body: ir.list_reply.title };
+      } else if (ir?.button_reply) {
+        interactiveReply = { type: "button_reply", id: ir.button_reply.id, title: ir.button_reply.title };
+        textBody = { body: ir.button_reply.title };
+      }
+    }
+
     return {
       from: msg.from as string,
       id: msg.id as string,
       timestamp: msg.timestamp as string,
-      type: msg.type as string,
-      text: msg.text as { body: string } | undefined,
+      type: msgType,
+      text: textBody,
+      interactive: interactiveReply,
       phoneNumberId: metadata?.phone_number_id ?? "",
     };
   } catch {
@@ -161,6 +186,116 @@ export async function sendWhatsAppTemplate(
     return false;
   }
 
+  return true;
+}
+
+export interface InteractiveListRow {
+  id: string;
+  title: string;
+  description?: string;
+}
+
+export interface InteractiveListSection {
+  title: string;
+  rows: InteractiveListRow[];
+}
+
+export async function sendWhatsAppInteractiveList(
+  phoneNumberId: string,
+  to: string,
+  bodyText: string,
+  buttonText: string,
+  sections: InteractiveListSection[],
+  headerText?: string,
+  footerText?: string,
+): Promise<boolean> {
+  const config = getConfig();
+  if (!config.apiToken) {
+    console.error("[whatsapp] API token not configured");
+    return false;
+  }
+
+  const interactive: Record<string, unknown> = {
+    type: "list",
+    body: { text: bodyText },
+    action: { button: buttonText, sections },
+  };
+  if (headerText) interactive.header = { type: "text", text: headerText };
+  if (footerText) interactive.footer = { text: footerText };
+
+  const url = `${config.apiUrl}/${phoneNumberId}/messages`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "interactive",
+      interactive,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error("[whatsapp] interactive list send failed:", response.status, await response.text());
+    return false;
+  }
+  return true;
+}
+
+export interface ReplyButton {
+  id: string;
+  title: string;
+}
+
+export async function sendWhatsAppReplyButtons(
+  phoneNumberId: string,
+  to: string,
+  bodyText: string,
+  buttons: ReplyButton[],
+  headerText?: string,
+  footerText?: string,
+): Promise<boolean> {
+  const config = getConfig();
+  if (!config.apiToken) {
+    console.error("[whatsapp] API token not configured");
+    return false;
+  }
+
+  const interactive: Record<string, unknown> = {
+    type: "button",
+    body: { text: bodyText },
+    action: {
+      buttons: buttons.slice(0, 3).map((b) => ({
+        type: "reply",
+        reply: { id: b.id, title: b.title.slice(0, 20) },
+      })),
+    },
+  };
+  if (headerText) interactive.header = { type: "text", text: headerText };
+  if (footerText) interactive.footer = { text: footerText };
+
+  const url = `${config.apiUrl}/${phoneNumberId}/messages`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "interactive",
+      interactive,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error("[whatsapp] reply buttons send failed:", response.status, await response.text());
+    return false;
+  }
   return true;
 }
 
