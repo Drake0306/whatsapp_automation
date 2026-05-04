@@ -6,6 +6,7 @@
   const availableModels = $derived($page.data.availableModels ?? []);
   const formError = $derived($page.form?.error as string | undefined);
   const formSuccess = $derived($page.form?.success as boolean | undefined);
+  const formWarning = $derived($page.form?.warning as string | undefined);
 
   let saving = $state(false);
 
@@ -44,9 +45,15 @@
     </div>
   {/if}
 
-  {#if formSuccess}
+  {#if formSuccess && !formWarning}
     <div class="mt-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
       Routing updated successfully.
+    </div>
+  {/if}
+
+  {#if formWarning}
+    <div class="mt-4 rounded-md bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800">
+      {formWarning}
     </div>
   {/if}
 
@@ -73,9 +80,12 @@
               </span>
               <span class="text-sm font-medium">{model.apiModelId}</span>
             </div>
+            {#if model.description}
+              <p class="mt-1 text-xs text-muted-foreground">{model.description}</p>
+            {/if}
             <div class="mt-1 flex gap-3 text-xs text-muted-foreground">
-              <span>{(model.contextWindow / 1000).toFixed(0)}k ctx</span>
-              <span>{model.costPer1kInput === 0 && model.costPer1kOutput === 0 ? "Free" : `$${model.costPer1kInput}/$${model.costPer1kOutput}`}</span>
+              <span>{model.contextWindow >= 1_000_000 ? `${(model.contextWindow / 1_000_000).toFixed(0)}M ctx` : `${(model.contextWindow / 1000).toFixed(0)}K ctx`}</span>
+              <span>{model.costPer1kInput === 0 && model.costPer1kOutput === 0 ? "Free" : `$${model.costPer1kInput}/$${model.costPer1kOutput} per 1K`}</span>
             </div>
           </div>
         {/each}

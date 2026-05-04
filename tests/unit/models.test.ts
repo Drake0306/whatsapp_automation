@@ -3,13 +3,18 @@ import { models, skillRouting, getModelForSkill } from "$lib/config/models.js";
 
 describe("models config", () => {
   it("has all expected models", () => {
-    expect(Object.keys(models)).toEqual([
-      "gemini-flash",
-      "gemini-flash-lite",
-      "groq-llama",
-      "sarvam-m",
-      "claude-sonnet",
-    ]);
+    const ids = Object.keys(models);
+    expect(ids).toContain("gemini-flash");
+    expect(ids).toContain("gemini-flash-lite");
+    expect(ids).toContain("groq-llama-70b");
+    expect(ids).toContain("groq-llama-8b");
+    expect(ids).toContain("groq-llama4-scout");
+    expect(ids).toContain("groq-gpt-oss-120b");
+    expect(ids).toContain("groq-gpt-oss-20b");
+    expect(ids).toContain("groq-qwen3-32b");
+    expect(ids).toContain("sarvam-m");
+    expect(ids).toContain("claude-sonnet");
+    expect(ids.length).toBe(10);
   });
 
   it("every model has required fields", () => {

@@ -34,6 +34,7 @@ export const load: PageServerLoad = async () => {
     contextWindow: m.contextWindow,
     costPer1kInput: m.costPer1kInput,
     costPer1kOutput: m.costPer1kOutput,
+    description: m.description ?? null,
   }));
 
   return { skills, availableModels };
@@ -54,7 +55,11 @@ export const actions: Actions = {
       }
     }
 
-    await saveSkillRouting(overrides);
+    const result = await saveSkillRouting(overrides);
+
+    if (result.error) {
+      return { success: true, warning: result.error };
+    }
 
     return { success: true };
   },
