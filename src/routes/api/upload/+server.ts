@@ -4,10 +4,14 @@ import { db } from "$lib/server/db/index.js";
 import { businesses, businessDocs } from "$lib/server/db/schema.js";
 import { eq } from "drizzle-orm";
 import { extractText, chunkText } from "$lib/server/file-extract.js";
-import { uploadFile, buildStorageKey } from "$lib/server/storage.js";
+import { env } from "$env/dynamic/private";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_EXTENSIONS = new Set([".pdf", ".txt", ".csv", ".doc", ".docx"]);
+
+function isR2Configured(): boolean {
+  return !!(env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY);
+}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   const session = await locals.auth();
@@ -33,31 +37,47 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   const uploaded: string[] = [];
+  const errors: string[] = [];
 
   for (const file of files) {
     if (file.size > MAX_FILE_SIZE) {
+      errors.push(`${file.name}: exceeds 10MB limit`);
       continue;
     }
 
     const ext = file.name.includes(".") ? `.${file.name.split(".").pop()?.toLowerCase()}` : "";
     if (!ALLOWED_EXTENSIONS.has(ext)) {
+      errors.push(`${file.name}: unsupported file type`);
       continue;
     }
 
+    let text: string;
     const buffer = await file.arrayBuffer();
-    const text = await extractText(buffer, file.name);
+    try {
+      text = await extractText(buffer, file.name);
+    } catch (err) {
+      console.error(`[upload] extractText failed for ${file.name}:`, err);
+      errors.push(`${file.name}: failed to extract text`);
+      continue;
+    }
 
-    if (!text.trim()) continue;
+    if (!text.trim()) {
+      errors.push(`${file.name}: no text content found`);
+      continue;
+    }
 
     let storageKey: string | null = null;
-    try {
-      storageKey = await uploadFile(
-        buildStorageKey(business.id, file.name),
-        Buffer.from(buffer),
-        file.type || "application/octet-stream",
-      );
-    } catch {
-      // R2 creds not configured yet — store text in DB only
+    if (isR2Configured()) {
+      try {
+        const { uploadFile, buildStorageKey } = await import("$lib/server/storage.js");
+        storageKey = await uploadFile(
+          buildStorageKey(business.id, file.name),
+          Buffer.from(buffer),
+          file.type || "application/octet-stream",
+        );
+      } catch (err) {
+        console.warn(`[upload] R2 upload failed for ${file.name}, storing text only:`, err);
+      }
     }
 
     const chunks = chunkText(text);
@@ -72,8 +92,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       });
     }
 
+    console.log(`[upload] Stored ${chunks.length} chunks from ${file.name} for business ${business.name}`);
     uploaded.push(file.name);
   }
 
-  return json({ uploaded, chunks: uploaded.length });
+  return json({ uploaded, errors, chunks: uploaded.length });
 };
