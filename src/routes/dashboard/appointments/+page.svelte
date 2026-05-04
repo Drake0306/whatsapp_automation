@@ -6,6 +6,7 @@
   const filter = $derived($page.data.filter ?? "upcoming");
 
   const statusColors: Record<string, string> = {
+    pending: "bg-orange-100 text-orange-800",
     confirmed: "bg-green-100 text-green-800",
     completed: "bg-blue-100 text-blue-800",
     cancelled: "bg-red-100 text-red-800",
@@ -83,7 +84,20 @@
                   </span>
                 </td>
                 <td class="py-3">
-                  {#if appt.status === "confirmed"}
+                  {#if appt.status === "pending"}
+                    <div class="flex gap-1">
+                      <form method="POST" action="?/update-status" use:enhance>
+                        <input type="hidden" name="appointmentId" value={appt.id} />
+                        <input type="hidden" name="status" value="confirmed" />
+                        <button class="rounded bg-green-50 px-2 py-1 text-xs text-green-700 hover:bg-green-100">Approve</button>
+                      </form>
+                      <form method="POST" action="?/update-status" use:enhance>
+                        <input type="hidden" name="appointmentId" value={appt.id} />
+                        <input type="hidden" name="status" value="cancelled" />
+                        <button class="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50">Reject</button>
+                      </form>
+                    </div>
+                  {:else if appt.status === "confirmed"}
                     <div class="flex gap-1">
                       <form method="POST" action="?/update-status" use:enhance>
                         <input type="hidden" name="appointmentId" value={appt.id} />

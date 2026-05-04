@@ -52,6 +52,27 @@ WhatsAppFlow — SvelteKit 2 SaaS platform. AI WhatsApp automation for Indian sm
 - `src/lib/components/PageSkeleton.svelte` — 8 variants: dashboard, list, chat, table, analytics, escalations, form, cards
 - `src/lib/components/Skeleton.svelte` — base primitive (animated pulse bar via Tailwind `animate-pulse`)
 
+### Dashboard Subpage Layout (MUST follow for all new pages)
+- Every dashboard subpage uses the same wrapper structure:
+  ```svelte
+  <div class="min-h-screen">
+    <header class="border-b">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+        <h1 class="text-xl font-bold">Page Title</h1>
+        <a href="/dashboard" class="text-sm text-muted-foreground hover:text-foreground">
+          Back to Dashboard
+        </a>
+      </div>
+    </header>
+    <main class="mx-auto max-w-5xl px-4 py-8">
+      <!-- page content -->
+    </main>
+  </div>
+  ```
+- Reference pages: `appointments`, `contacts`, `knowledge`, `broadcasts`
+- New pages MUST also be added to the skeleton map in `src/routes/dashboard/+layout.svelte`
+- New pages MUST also be added to the nav in `src/routes/dashboard/+page.svelte`
+
 ### Form Loading States (SvelteKit enhance)
 - Every form uses `use:enhance` with `submitting` state → disabled buttons + loading text
 - Pattern: set state true in enhance callback, reset in `async ({ update })` return
